@@ -2,6 +2,60 @@
     ViewData["Title"] = "ViewPassword";
     Layout = "~/Views/_Layout.cshtml";
 }
+
+
+<div>
+    <div class="md:grid md:grid-cols-3 md:gap-6">
+        <div class="md:col-span-1">
+            <div class="px-4 sm:px-0">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Share secret</h3>
+                <p class="mt-1 text-sm text-gray-600">SnapPass allows you to share secrets in a secure, ephemeral way. Input a single or multi-line secret, its expiration time, and click Generate URL. Share the one-time use URL with your intended recipient.</p>
+            </div>
+        </div>
+        <div class="mt-5 md:col-span-2 md:mt-0">
+            <form role="form" id="password_create" method="post" autocomplete="off">
+                <div class="shadow sm:overflow-hidden sm:rounded-md">
+                    <div class="space-y-6 bg-white px-4 py-5 sm:p-6">
+
+                        <div>
+                            <label for="about" class="block text-sm font-medium text-gray-700">About</label>
+                            <div class="mt-1">
+                                <textarea id="password" name="password" autofocus="true" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Enter sensitive data to securely share..." aria-describedby="basic-addon1" autocomplete="off" required></textarea>
+                            </div>
+                        </div>
+
+
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 text-right sm:px-6 grid grid-cols-3 gap-4">
+                        <div class="">
+                            <button type="button" class="inline-flex justify-center rounded-md border border-transparent bg-indigo-200 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2" id="generate-pw">Generate Password</button>
+
+                        </div>
+                        <div class="">
+                            <label for="ttl" class="block text-sm font-medium text-gray-700">Expire after</label>
+                            <select id="ttl" name="ttl" autocomplete="country-name" class="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
+                                <option value="Month">Month</option>
+                                <option value="Week">Week</option>
+                                <option value="Day" selected>Day</option>
+                                <option value="Hour">Hour</option>
+                            </select>
+                        </div>
+                        <div class="">
+                            <button type="submit" class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" id="submit">Generate URL</button>
+                        </div>
+
+                        
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+@*
+
 <div class="container">
     <section>
         <div class="page-header"><h1>Set Secret</h1></div>
@@ -30,5 +84,6 @@
             </form> 
         </div>
     </section>
-</div>
+</div>*@
+
 <script src="~/js/generate_pw.js"></script>
