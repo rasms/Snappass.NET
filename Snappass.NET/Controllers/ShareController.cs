@@ -35,8 +35,8 @@ namespace Snappass.Controllers
                 "week" => TimeToLive.Week,
                 "day" => TimeToLive.Day,
                 "hour" => TimeToLive.Hour,
-                "twoweeks" => TimeToLive.TwoWeeks,
-                _ => throw new ArgumentException("Expected twoweeks, week, day or hour"),
+                "month" => TimeToLive.Month,
+                _ => throw new ArgumentException("Expected month, week, day or hour"),
             };
             TimeToLive timeToLive = Parse(ttl);
             string storageKey = Guid.NewGuid().ToString("N").ToUpper();

@@ -71,7 +71,7 @@ namespace Snappass
                 TimeToLive.Day => item.StoredDateTime.AddDays(1),
                 TimeToLive.Week => item.StoredDateTime.AddDays(7),
                 TimeToLive.Hour => item.StoredDateTime.AddHours(1),
-                TimeToLive.TwoWeeks => item.StoredDateTime.AddDays(14),
+                TimeToLive.Month => item.StoredDateTime.AddDays(31),
                 _ => item.StoredDateTime.AddHours(1),
             };
             DateTime atTheLatest = GetAtTheLatest(item.TimeToLive);
@@ -82,7 +82,7 @@ namespace Snappass
                     TimeToLive.Week => "1 week",
                     TimeToLive.Day => "1 day",
                     TimeToLive.Hour => "1 hour",
-                    TimeToLive.TwoWeeks => "2 weeks",
+                    TimeToLive.Month => "1 month",
                     _ => "1 hour",
                 };
                 var ttlString = ToString(item.TimeToLive);
