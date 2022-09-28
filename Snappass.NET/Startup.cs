@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
-using System.Data.SQLite;
 
 namespace Snappass
 {
@@ -35,8 +35,8 @@ namespace Snappass
 			services.AddScoped(sp =>
 			{
 				var databaseFilePath = @"database.sqlite";
-				var connectionString = $@"Data Source={databaseFilePath};Version=3;";
-				return new SQLiteConnection(connectionString);
+				var connectionString = $@"Data Source={databaseFilePath}";
+				return new SqliteConnection(connectionString);
 			});
         }
 
