@@ -4,20 +4,25 @@
     Layout = "~/Views/_Layout.cshtml";
 }
 
-<div class="container">
-    <section>
-        <div class="page-header"><h1>Share Secret Link</h1></div>
-        <p>The secret has been temporarily saved. Send the following URL to your intended recipient.</p>
-        <div class="input-group">
-            <input type="text" class="form-control" id="password-link" cols="50" value="@Model.Uri" readonly="readonly">
-            <span class="input-group-btn margin-bottom-10">
-                <button title="Copy to clipboard" type="button" class="btn btn-primary copy-clipboard-btn"
-                        id="copy-clipboard-btn" data-clipboard-target="#password-link"
-                        data-placement='bottom'>
-                    <i class="fa fa-clipboard"></i>
-                </button>
-            </span>
+
+<div class="flex min-h-full md:items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8">
+        <div>
+            <img class="mx-auto h-12 w-auto" src="~/logoipsum-262.svg" alt="Your Company">
+            <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">Share Secret Link</h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                The secret has been temporarily saved. Send the following URL to your intended recipient.
+            </p>
         </div>
-    </section>
+        <div class="mt-1 flex rounded-md shadow-sm">
+            <input type="text" class="block w-full flex-1 rounded-none rounded-l-md border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2 pl-4" id="password-link" value="@Model.Uri" readonly="readonly">
+            <button title="Copy to clipboard" type="button" class="inline-flex items-center rounded-r-md border border-l-0 bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 py-2 px-4 text-sm"
+                    id="copy-clipboard-btn" data-clipboard-target="#password-link"
+                    data-placement='bottom'>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" class="w-3 fill-white	"><path d="M192 0c-41.8 0-77.4 26.7-90.5 64H48C21.5 64 0 85.5 0 112V464c0 26.5 21.5 48 48 48H336c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H282.5C269.4 26.7 233.8 0 192 0zm0 128c-17.7 0-32-14.3-32-32s14.3-32 32-32s32 14.3 32 32s-14.3 32-32 32zm-80 64H272c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16z" /></svg>
+            </button>
+        </div>
+    </div>
 </div>
+
 <script src="~/js/clipboard_button.js"></script>
