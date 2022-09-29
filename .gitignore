@@ -30,3 +30,5 @@ mono_crash.*
 #wwwroot/
 
 Snappass.NET/database.sqlite
+
+Snappass.NET/node_modules/
