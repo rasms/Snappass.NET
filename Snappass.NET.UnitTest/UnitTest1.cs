@@ -15,9 +15,9 @@ namespace Snappass.NET.UnitTest
 			var createScript = $@"
 				CREATE TABLE ""Secret"" (
 					""Key""	TEXT UNIQUE,
-					""TimeToLive""	INTEGER NOT NULL,
+					""CreatedDt""	TEXT NOT NULL,
+					""ExpireDt""	TEXT NOT NULL,
 					""EncryptedPassword""	TEXT NOT NULL,
-					""StoredDateTime""	TEXT NOT NULL,
 					PRIMARY KEY(""Key"")
 				)
 			";
