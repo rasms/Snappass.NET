@@ -2,7 +2,7 @@ using Dapper;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Data;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 
 namespace Snappass
@@ -56,12 +56,12 @@ namespace Snappass
 				parameter.Value = (int)value;
 			}
 		}
-		private readonly SQLiteConnection _sqliteConnection;
+		private readonly SqliteConnection _sqliteConnection;
 		private readonly ILogger<SqliteStore> _logger;
 		private readonly IDateTimeProvider _dateTimeProvider;
 		private bool _disposed;
 
-		public SqliteStore(SQLiteConnection sqliteConnection, ILogger<SqliteStore> logger, IDateTimeProvider dateTimeProvider)
+		public SqliteStore(SqliteConnection sqliteConnection, ILogger<SqliteStore> logger, IDateTimeProvider dateTimeProvider)
 		{
 			_sqliteConnection = sqliteConnection;
 			_logger = logger;
@@ -71,14 +71,20 @@ namespace Snappass
 		}
 		public bool Has(string key)
 		{
-			var query = $@"
+			SqliteCommand select = _sqliteConnection.CreateCommand();
+			select.CommandText = $@"
 				SELECT EXISTS (
 					SELECT 1 
 					FROM SECRET
 					WHERE Key = @key
-				)
-			";
-			return _sqliteConnection.ExecuteScalar<bool>(query, new { Key = key });
+				)";
+			select.Parameters.AddWithValue("@key", key);
+
+			_sqliteConnection.Open();
+			var result = select.ExecuteScalar();
+			_sqliteConnection.Close();
+
+			return Convert.ToBoolean(result);
 		}
 
 		public string Retrieve(string key)
@@ -93,12 +99,26 @@ namespace Snappass
 				_logger.Log(LogLevel.Warning, $@"Tried to retrieve password for unknown key [{key}]");
 				return null;
 			}
-			var query = $@"
+            SqliteCommand select = _sqliteConnection.CreateCommand();
+            select.CommandText = $@"
 				SELECT Key, TimeToLive, EncryptedPassword, StoredDateTime
 				FROM SECRET
 				WHERE Key = @key
 			";
-			var secret = _sqliteConnection.QuerySingle<Secret>(query, new { Key = key });
+            select.Parameters.AddWithValue("@key", key);
+			_sqliteConnection.Open();
+			var result = select.ExecuteReader();
+			if (result.Read())
+			{
+				var secret = new Secret
+				{
+					Key = result.GetString(0),
+					TimeToLive = result.GetInt32(1),
+					EncryptedPassword = result.GetString(2),
+					StoredDateTime = result.GetDateTime(3)
+				};
+			}
+            //var secret = _sqliteConnection.QuerySingle<Secret>(query, new { Key = key });
 			static DateTime GetAtTheLatest(TimeToLive ttl, DateTime dateTime) => ttl switch
 			{
 				TimeToLive.Day => dateTime.AddDays(1),
@@ -139,7 +159,9 @@ namespace Snappass
 
 		public void Store(string encryptedPassword, string key, TimeToLive timeToLive)
 		{
-			var query = $@"
+			var insert = _sqliteConnection.CreateCommand();
+
+            insert.CommandText = $@"
 				INSERT INTO Secret (Key, TimeToLive, EncryptedPassword, StoredDateTime)
 				VALUES (@key, @timeToLive, @encryptedPassword, @storedDateTime)
 			";
@@ -151,7 +173,15 @@ namespace Snappass
 				EncryptedPassword = encryptedPassword,
 				StoredDateTime = storedDateTime
 			};
-			_sqliteConnection.Execute(query, parameters);
+
+			insert.Parameters.AddWithValue("@key", key);
+			insert.Parameters.AddWithValue("@timeToLive", timeToLive);
+			insert.Parameters.AddWithValue("@encryptedPassword", encryptedPassword);
+			insert.Parameters.AddWithValue("@storedDateTime", storedDateTime);
+			_sqliteConnection.Open();
+			insert.ExecuteNonQuery();
+			_sqliteConnection.Close();
+			//_sqliteConnection.Execute(query);
 		}
 
 		public void Dispose()
