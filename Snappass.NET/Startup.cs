@@ -74,7 +74,7 @@ namespace Snappass
                     pattern: "{controller=Share}/{action=Share}");
                 endpoints.MapControllerRoute(
                     name: "password",
-                    pattern: "Password/{key}", new { controller = "Password", action = "Preview" });
+                    pattern: "pwd/{key}", new { controller = "Password", action = "Preview" });
             });
         }
     }

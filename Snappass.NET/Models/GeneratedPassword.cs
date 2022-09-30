@@ -4,6 +4,6 @@
     {
         public string Token { get; set; }
         public string BaseUri { get; set; }
-        public string Uri => $@"{BaseUri}/Password/{Token}";
+        public string Uri => $@"{BaseUri}/pwd/{Token}";
     }
 }
