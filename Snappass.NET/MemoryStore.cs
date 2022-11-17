@@ -23,9 +23,9 @@ namespace Snappass
     {
         private class Item
         {
-            public DateTime StoredDateTime { get; set; }
-            public TimeToLive TimeToLive { get; set; }
             public string Key { get; set; }
+            public DateTime CreatedDt { get; set; }
+            public DateTime ExpireDt { get; set; }
             public string EncryptedPassword { get; set; }
         }
 
@@ -43,12 +43,28 @@ namespace Snappass
 
         public void Store(string encryptedPassword, string key, TimeToLive timeToLive) 
         {
+            int ttlHours = 0;
+            switch (timeToLive.ToString().ToLower())
+            {
+                case "hour":
+                    ttlHours = 1;
+                    break;
+                case "day":
+                    ttlHours = 24;
+                    break;
+                case "week":
+                    ttlHours = 168;
+                    break;
+                case "month":
+                    ttlHours = 5208;
+                    break;
+            }
             var item = new Item
             {
-                StoredDateTime = DateTime.Now,
-                TimeToLive = timeToLive,
-                EncryptedPassword = encryptedPassword,
-                Key = key
+                Key = key,
+                CreatedDt = DateTime.Now,
+                ExpireDt = DateTime.Now.AddHours(ttlHours),
+                EncryptedPassword = encryptedPassword
             };
             _items.Add(key, item);
         }
@@ -66,27 +82,10 @@ namespace Snappass
                 return null;
             }
             var item = _items[key];
-            DateTime GetAtTheLatest(TimeToLive ttl) => ttl switch
+
+            if (_dateTimeProvider.Now > item.ExpireDt)
             {
-                TimeToLive.Day => item.StoredDateTime.AddDays(1),
-                TimeToLive.Week => item.StoredDateTime.AddDays(7),
-                TimeToLive.Hour => item.StoredDateTime.AddHours(1),
-                TimeToLive.Month => item.StoredDateTime.AddDays(31),
-                _ => item.StoredDateTime.AddHours(1),
-            };
-            DateTime atTheLatest = GetAtTheLatest(item.TimeToLive);
-            if (_dateTimeProvider.Now > atTheLatest)
-            {
-                static string ToString(TimeToLive ttl) => ttl switch
-                {
-                    TimeToLive.Week => "1 week",
-                    TimeToLive.Day => "1 day",
-                    TimeToLive.Hour => "1 hour",
-                    TimeToLive.Month => "1 month",
-                    _ => "1 hour",
-                };
-                var ttlString = ToString(item.TimeToLive);
-                _logger.Log(LogLevel.Warning, $@"Tried to retrieve password for key [{key}] after date is expired. Key set at [{item.StoredDateTime}] for [{ttlString}]");
+                _logger.Log(LogLevel.Warning, $@"Tried to retrieve password for key [{key}] after date is expired. Key set at [{item.CreatedDt}] and expired at [{item.ExpireDt}]");
                 _items.Remove(key); // ensure "read-once" is implemented
                 return null;
             }
