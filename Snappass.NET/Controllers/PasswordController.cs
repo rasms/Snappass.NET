@@ -23,7 +23,8 @@ namespace Snappass.Controllers
             if (!_memoryStore.Has(storageKey))
             {
                 _logger.LogWarning($@"password with key {storageKey} requested, but not found");
-                return NotFound();
+                ViewBag.Expired = true;
+                return View("../Share/Share");
             }
             if (HttpContext.Request.Method == "POST")
             {
