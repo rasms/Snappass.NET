@@ -2,16 +2,16 @@ using Dapper;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Snappass.NET.UnitTest
 {
 	public class UnitTest1
 	{
-		private static SQLiteConnection CreateConnection()
+		private static SqliteConnection CreateConnection()
 		{
-			var sqliteConnection = new SQLiteConnection("Data Source=:memory:");
+			var sqliteConnection = new SqliteConnection("Data Source=:memory:");
 			var createScript = $@"
 				CREATE TABLE ""Secret"" (
 					""Key""	TEXT UNIQUE,

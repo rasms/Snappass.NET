@@ -99,8 +99,6 @@ namespace Snappass
 					EncryptedPassword = result.GetString(3)
 				};
 			
-            //var secret = _sqliteConnection.QuerySingle<Secret>(query, new { Key = key });
-
 			if (_dateTimeProvider.Now > secret.ExpireDt)
 			{	
 				_logger.Log(LogLevel.Warning, $@"Tried to retrieve password for key [{key}] after date is expired. Key set at [{secret.CreatedDt}] and expired at [{secret.ExpireDt}]");
@@ -164,7 +162,6 @@ namespace Snappass
 			_sqliteConnection.Open();
 			insert.ExecuteNonQuery();
 			_sqliteConnection.Close();
-			//_sqliteConnection.Execute(query);
 		}
 
 		public void Dispose()
