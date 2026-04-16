@@ -50,20 +50,28 @@ namespace Snappass
 			_dateTimeProvider = dateTimeProvider;
 			SqlMapper.AddTypeHandler(new DateTimeHandler());
 		}
+
+		private void EnsureOpen()
+		{
+			if (_sqliteConnection.State != ConnectionState.Open)
+			{
+				_sqliteConnection.Open();
+			}
+		}
+
 		public bool Has(string key)
 		{
 			SqliteCommand select = _sqliteConnection.CreateCommand();
 			select.CommandText = $@"
 				SELECT EXISTS (
-					SELECT 1 
+					SELECT 1
 					FROM SECRET
 					WHERE Key = @key
 				)";
 			select.Parameters.AddWithValue("@key", key);
 
-			_sqliteConnection.Open();
+			EnsureOpen();
 			var result = select.ExecuteScalar();
-			_sqliteConnection.Close();
 
 			return Convert.ToBoolean(result);
 		}
@@ -87,7 +95,7 @@ namespace Snappass
 				WHERE Key = @key
 			";
             select.Parameters.AddWithValue("@key", key);
-			_sqliteConnection.Open();
+			EnsureOpen();
 			var result = select.ExecuteReader();
 			if (result.Read())
 			{
@@ -121,9 +129,8 @@ namespace Snappass
 				";
             delete.Parameters.AddWithValue("@key", key);
             delete.Parameters.AddWithValue("@now", DateTime.Now);
-			_sqliteConnection.Open();
+			EnsureOpen();
             delete.ExecuteNonQuery();
-            _sqliteConnection.Close();
         }
 
 		public void Store(string encryptedPassword, string key, TimeToLive timeToLive)
@@ -159,9 +166,8 @@ namespace Snappass
 			insert.Parameters.AddWithValue("@createdDt", createdDt);
 			insert.Parameters.AddWithValue("@expireDt", expireDt);
 			insert.Parameters.AddWithValue("@encryptedPassword", encryptedPassword);
-			_sqliteConnection.Open();
+			EnsureOpen();
 			insert.ExecuteNonQuery();
-			_sqliteConnection.Close();
 		}
 
 		public void Dispose()
