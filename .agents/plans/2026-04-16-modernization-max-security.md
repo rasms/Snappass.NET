@@ -75,23 +75,30 @@ Klartext eines Secrets hat**.
 - [x] GitHub Actions: build + test, Dependabot
 - [x] `SqliteStore` Open/Close-Bug gefixt (war Test-Blocker)
 
-### Phase 2 — Security-Kern
-- [ ] Neue Minimal-API-Endpunkte wie oben
-- [ ] Alte Controller weg
-- [ ] Frontend-Crypto-Modul in TypeScript (esbuild), AES-256-GCM via
+### Phase 2 — Security-Kern ✓
+- [x] Neue Minimal-API-Endpunkte wie oben
+- [x] Alte Controller/Views/Models/Encryption.cs weg
+- [x] Frontend-Crypto-Modul in TypeScript (esbuild), AES-256-GCM via
       `SubtleCrypto`
-- [ ] Key im URL-Fragment, niemals im Pfad/Query
-- [ ] Proper Base64Url statt `Replace("-","+")`-Hack
+- [x] Key im URL-Fragment, niemals im Pfad/Query
+- [x] Proper Base64Url (kein `Replace("-","+")`-Hack mehr)
+- [x] Strenge CSP: `default-src 'none'; script-src 'self'; style-src 'self';
+      connect-src 'self'; img-src 'self'; form-action 'self'; base-uri 'self';
+      frame-ancestors 'none'`
+- [x] jQuery + Clipboard.js raus → `navigator.clipboard`
+- [x] Passwortgenerator: `crypto.getRandomValues` mit Rejection-Sampling
+      (unbiased)
+- [x] Size-Limit auf Ciphertext (100 KB, serverseitig), TTL-Whitelist
+      serverseitig (Enum.TryParse)
 
 ### Phase 3 — Hardening
-- [ ] Antiforgery-Token für Share-Submit
 - [ ] `AddRateLimiter` (z. B. 10 Share/min, 30 Consume/min pro IP)
-- [ ] Size-Limit auf Ciphertext (z. B. 64 KiB), TTL-Whitelist serverseitig
-- [ ] CSP verschärfen: `default-src 'none'; script-src 'self';
-      style-src 'self'; connect-src 'self'; img-src 'self'`
-- [ ] jQuery + Clipboard.js raus → `navigator.clipboard`
-- [ ] Passwortgenerator: `crypto.getRandomValues`, korrekte Länge,
-      unbiased index
+- [ ] Antiforgery für Share-Submit (Origin/Referer-Check — echtes CSRF
+      ist bei JSON-only API von `SameSite`-Cookies eh abgedeckt, aber
+      sicher ist sicher)
+- [ ] `Request.Body` Size-Limit (Kestrel) zusätzlich zum App-Check
+- [ ] `MaxRequestBodySize` in `KestrelServerOptions`
+- [ ] HTTPS-Redirect nur in Production (steht schon, prüfen)
 
 ### Phase 4 — Storage-Layer
 - [ ] Einheitliches Connection-Lifecycle (Factory oder Singleton + WAL)
