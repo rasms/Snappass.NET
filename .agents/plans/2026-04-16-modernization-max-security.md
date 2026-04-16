@@ -67,12 +67,13 @@ Klartext eines Secrets hat**.
 
 ## 3. Phasen
 
-### Phase 1 — Fundament
-- [ ] `TargetFramework` → `net10.0`, Packages aktualisieren
-- [ ] `<Nullable>enable</Nullable>` + `<ImplicitUsings>enable</ImplicitUsings>`
-- [ ] `Startup.cs` → Top-Level Minimal Hosting in `Program.cs`
-- [ ] `node_modules` aus Git entfernen, `.gitignore` aufräumen
-- [ ] GitHub Actions: build + test, Dependabot
+### Phase 1 — Fundament ✓
+- [x] `TargetFramework` → `net10.0`, Packages aktualisieren
+- [x] `<Nullable>enable</Nullable>` + `<ImplicitUsings>enable</ImplicitUsings>`
+- [x] `Startup.cs` → Top-Level Minimal Hosting in `Program.cs`
+- [x] `node_modules` aus Git entfernen, `.gitignore` aufräumen
+- [x] GitHub Actions: build + test, Dependabot
+- [x] `SqliteStore` Open/Close-Bug gefixt (war Test-Blocker)
 
 ### Phase 2 — Security-Kern
 - [ ] Neue Minimal-API-Endpunkte wie oben
