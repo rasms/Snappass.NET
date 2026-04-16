@@ -33,6 +33,15 @@ Snappass.NET/database.sqlite
 
 Snappass.NET/node_modules/
 
+# Built frontend artifacts (produced by `npm run build` / `dotnet build`)
+Snappass.NET/wwwroot/js/share.js
+Snappass.NET/wwwroot/js/share.js.map
+Snappass.NET/wwwroot/js/reveal.js
+Snappass.NET/wwwroot/js/reveal.js.map
+Snappass.NET/wwwroot/js/clipboard.js
+Snappass.NET/wwwroot/js/clipboard.js.map
+Snappass.NET/wwwroot/css/style.css
+
 # macOS
 .DS_Store
 

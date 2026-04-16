@@ -1,182 +1,146 @@
-using Dapper;
-using Microsoft.Extensions.Logging;
-using System;
 using System.Data;
-using Microsoft.Data.Sqlite;
 using System.Globalization;
-using System.Collections.Generic;
+using Dapper;
+using Microsoft.Data.Sqlite;
 
-namespace Snappass
+namespace Snappass;
+
+public sealed class SqliteStore : ISecretStore, IDisposable
 {
-	public sealed class SqliteStore : IMemoryStore, IDisposable
+	private sealed class Secret
 	{
-		private class Secret 
-		{
-			public string Key { get; set; }
-			public DateTime CreatedDt { get; set; }
-			public DateTime ExpireDt { get; set; }
-			public string EncryptedPassword { get; set; }
-		}
-		private class DateTimeHandler : SqlMapper.TypeHandler<DateTime>
-		{
-			private static readonly DateTimeHandler Default = new DateTimeHandler();
-			internal const string FORMAT = "yyyy-MM-dd HH:mm:ss";
+		public string Id { get; set; } = string.Empty;
+		public DateTime CreatedDt { get; set; }
+		public DateTime ExpireDt { get; set; }
+		public string Ciphertext { get; set; } = string.Empty;
+	}
 
-			public override DateTime Parse(object value)
-			{
-				if (value == null)
-				{
-					return DateTime.MinValue;
-				}
-				var parsed = DateTime.ParseExact(value.ToString(), FORMAT, CultureInfo.InvariantCulture);
-				return parsed;
-			}
+	private sealed class DateTimeHandler : SqlMapper.TypeHandler<DateTime>
+	{
+		internal const string FORMAT = "yyyy-MM-dd HH:mm:ss";
 
-			public override void SetValue(IDbDataParameter parameter, DateTime value)
-			{
-				parameter.Value = value.ToString(FORMAT, CultureInfo.InvariantCulture);
-			}
+		public override DateTime Parse(object value)
+		{
+			if (value is null) return DateTime.MinValue;
+			return DateTime.ParseExact(value.ToString()!, FORMAT, CultureInfo.InvariantCulture);
 		}
 
-		private readonly SqliteConnection _sqliteConnection;
-		private readonly ILogger<SqliteStore> _logger;
-		private readonly IDateTimeProvider _dateTimeProvider;
-		private bool _disposed;
-
-		public SqliteStore(SqliteConnection sqliteConnection, ILogger<SqliteStore> logger, IDateTimeProvider dateTimeProvider)
+		public override void SetValue(IDbDataParameter parameter, DateTime value)
 		{
-			_sqliteConnection = sqliteConnection;
-			_logger = logger;
-			_dateTimeProvider = dateTimeProvider;
-			SqlMapper.AddTypeHandler(new DateTimeHandler());
+			parameter.Value = value.ToString(FORMAT, CultureInfo.InvariantCulture);
+		}
+	}
+
+	private readonly SqliteConnection _connection;
+	private readonly ILogger<SqliteStore> _logger;
+	private readonly IDateTimeProvider _clock;
+	private bool _disposed;
+
+	public SqliteStore(SqliteConnection connection, ILogger<SqliteStore> logger, IDateTimeProvider clock)
+	{
+		_connection = connection;
+		_logger = logger;
+		_clock = clock;
+		SqlMapper.AddTypeHandler(new DateTimeHandler());
+	}
+
+	private void EnsureOpen()
+	{
+		if (_connection.State != ConnectionState.Open)
+		{
+			_connection.Open();
+		}
+	}
+
+	public bool Exists(string id)
+	{
+		EnsureOpen();
+		using var cmd = _connection.CreateCommand();
+		cmd.CommandText = @"
+			SELECT EXISTS (
+				SELECT 1 FROM Secret
+				WHERE Id = @id AND ExpireDt > @now
+			)";
+		cmd.Parameters.AddWithValue("@id", id);
+		cmd.Parameters.AddWithValue("@now", _clock.Now.ToString(DateTimeHandler.FORMAT, CultureInfo.InvariantCulture));
+		return Convert.ToBoolean(cmd.ExecuteScalar());
+	}
+
+	public string? Consume(string id)
+	{
+		EnsureOpen();
+		using var tx = _connection.BeginTransaction();
+
+		using var select = _connection.CreateCommand();
+		select.Transaction = tx;
+		select.CommandText = @"
+			SELECT Ciphertext, ExpireDt
+			FROM Secret
+			WHERE Id = @id";
+		select.Parameters.AddWithValue("@id", id);
+
+		string? ciphertext = null;
+		DateTime expire = DateTime.MinValue;
+		using (var reader = select.ExecuteReader())
+		{
+			if (reader.Read())
+			{
+				ciphertext = reader.GetString(0);
+				expire = DateTime.ParseExact(reader.GetString(1), DateTimeHandler.FORMAT, CultureInfo.InvariantCulture);
+			}
 		}
 
-		private void EnsureOpen()
+		using var delete = _connection.CreateCommand();
+		delete.Transaction = tx;
+		delete.CommandText = "DELETE FROM Secret WHERE Id = @id";
+		delete.Parameters.AddWithValue("@id", id);
+		delete.ExecuteNonQuery();
+
+		tx.Commit();
+
+		if (ciphertext is null)
 		{
-			if (_sqliteConnection.State != ConnectionState.Open)
-			{
-				_sqliteConnection.Open();
-			}
-		}
-
-		public bool Has(string key)
-		{
-			SqliteCommand select = _sqliteConnection.CreateCommand();
-			select.CommandText = $@"
-				SELECT EXISTS (
-					SELECT 1
-					FROM SECRET
-					WHERE Key = @key
-				)";
-			select.Parameters.AddWithValue("@key", key);
-
-			EnsureOpen();
-			var result = select.ExecuteScalar();
-
-			return Convert.ToBoolean(result);
-		}
-
-		public string Retrieve(string key)
-		{
-			if (key == null)
-			{
-				_logger.Log(LogLevel.Warning, $@"Tried to retrieve null key");
-				return null;
-			}
-			if (!Has(key))
-			{
-				_logger.Log(LogLevel.Warning, $@"Tried to retrieve password for unknown key [{key}]");
-				return null;
-			}
-            SqliteCommand select = _sqliteConnection.CreateCommand();
-            select.CommandText = $@"
-				SELECT Key, CreatedDt, ExpireDt, EncryptedPassword
-				FROM SECRET
-				WHERE Key = @key
-			";
-            select.Parameters.AddWithValue("@key", key);
-			EnsureOpen();
-			var result = select.ExecuteReader();
-			if (result.Read())
-			{
-				var secret = new Secret
-				{
-					Key = result.GetString(0),
-					CreatedDt = result.GetDateTime(1),
-					ExpireDt = result.GetDateTime(2),
-					EncryptedPassword = result.GetString(3)
-				};
-			
-			if (_dateTimeProvider.Now > secret.ExpireDt)
-			{	
-				_logger.Log(LogLevel.Warning, $@"Tried to retrieve password for key [{key}] after date is expired. Key set at [{secret.CreatedDt}] and expired at [{secret.ExpireDt}]");
-				Remove(key);
-				return null;
-			}
-			Remove(key);
-			return secret.EncryptedPassword;
-            }
+			_logger.LogWarning("Consume requested for unknown id");
 			return null;
-        }
-
-		private void Remove(string key)
-		{
-            SqliteCommand delete = _sqliteConnection.CreateCommand();
-            delete.CommandText = $@"
-					DELETE
-					FROM SECRET
-					WHERE Key = @key OR ExpireDt < Datetime(@now)
-				";
-            delete.Parameters.AddWithValue("@key", key);
-            delete.Parameters.AddWithValue("@now", DateTime.Now);
-			EnsureOpen();
-            delete.ExecuteNonQuery();
-        }
-
-		public void Store(string encryptedPassword, string key, TimeToLive timeToLive)
-		{
-			var insert = _sqliteConnection.CreateCommand();
-
-            insert.CommandText = $@"
-				INSERT INTO Secret (Key, CreatedDt, ExpireDt, EncryptedPassword)
-				VALUES (@key, @createdDt, @expireDt, @encryptedPassword)
-			";
-
-			int ttlHours = 0;
-			switch (timeToLive.ToString().ToLower())
-			{
-				case "hour":
-					ttlHours = 1;
-					break;
-				case "day":
-					ttlHours = 24;
-					break;
-				case "week":
-					ttlHours = 168;
-					break;
-				case "month":
-					ttlHours = 5208;
-                    break;
-			}
-
-			var createdDt = DateTime.Now.ToString(DateTimeHandler.FORMAT);
-			var expireDt = DateTime.Now.AddHours(ttlHours).ToString(DateTimeHandler.FORMAT);
-
-			insert.Parameters.AddWithValue("@key", key);
-			insert.Parameters.AddWithValue("@createdDt", createdDt);
-			insert.Parameters.AddWithValue("@expireDt", expireDt);
-			insert.Parameters.AddWithValue("@encryptedPassword", encryptedPassword);
-			EnsureOpen();
-			insert.ExecuteNonQuery();
 		}
-
-		public void Dispose()
+		if (_clock.Now > expire)
 		{
-			if (!_disposed)
-			{
-				_sqliteConnection.Dispose();
-				_disposed = true;
-			}
+			_logger.LogWarning("Consume requested for expired id (expired {Expire})", expire);
+			return null;
 		}
+		return ciphertext;
+	}
+
+	public void Store(string id, string ciphertext, TimeToLive ttl)
+	{
+		EnsureOpen();
+		using var insert = _connection.CreateCommand();
+		insert.CommandText = @"
+			INSERT INTO Secret (Id, CreatedDt, ExpireDt, Ciphertext)
+			VALUES (@id, @createdDt, @expireDt, @ciphertext)";
+
+		var now = _clock.Now;
+		var hours = TtlHours(ttl);
+		insert.Parameters.AddWithValue("@id", id);
+		insert.Parameters.AddWithValue("@createdDt", now.ToString(DateTimeHandler.FORMAT, CultureInfo.InvariantCulture));
+		insert.Parameters.AddWithValue("@expireDt", now.AddHours(hours).ToString(DateTimeHandler.FORMAT, CultureInfo.InvariantCulture));
+		insert.Parameters.AddWithValue("@ciphertext", ciphertext);
+		insert.ExecuteNonQuery();
+	}
+
+	private static int TtlHours(TimeToLive ttl) => ttl switch
+	{
+		TimeToLive.Hour => 1,
+		TimeToLive.Day => 24,
+		TimeToLive.Week => 24 * 7,
+		TimeToLive.Month => 24 * 31,
+		_ => throw new ArgumentOutOfRangeException(nameof(ttl)),
+	};
+
+	public void Dispose()
+	{
+		if (_disposed) return;
+		_connection.Dispose();
+		_disposed = true;
 	}
 }

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>Reveal secret</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.ico">
+</head>
+<body class="h-full">
+  <div class="flex min-h-full md:items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8">
+      <div>
+        <img class="mx-auto h-12 w-auto" src="/logoipsum-262.svg" alt="">
+        <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">Secret</h2>
+      </div>
+
+      <div id="expired" class="hidden bg-red-100 rounded-lg py-4 px-5 text-sm text-red-700" role="alert">
+        This link has expired or has already been opened.
+        <a href="/" class="underline ml-1">Share another secret.</a>
+      </div>
+
+      <div id="preview" class="hidden space-y-4">
+        <p class="text-center text-sm text-gray-600">
+          You can only reveal this secret once. Once you click, it is gone from the server forever.
+        </p>
+        <button id="reveal-btn" type="button"
+          class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50">
+          Reveal secret
+        </button>
+      </div>
+
+      <div id="revealed" class="hidden space-y-3">
+        <p class="text-center text-sm text-gray-600">
+          Save this secret somewhere safe — it will not be shown again.
+        </p>
+        <div class="rounded-md shadow-sm">
+          <label for="secret-text" class="sr-only">Secret</label>
+          <textarea id="secret-text" rows="5" readonly
+            class="block w-full rounded-t-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"></textarea>
+          <button type="button" data-clipboard-target="#secret-text" title="Copy to clipboard"
+            class="block w-full rounded-b-md border border-t-0 border-gray-300 bg-slate-400 py-2 px-4 text-sm font-medium text-white hover:bg-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500">
+            Copy to clipboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/reveal.js"></script>
+</body>
+</html>

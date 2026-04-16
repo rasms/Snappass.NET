@@ -13,4 +13,30 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="src\**" />
+    <None Include="src\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrontendSource Include="src/**/*.ts" />
+    <FrontendSource Include="Styles/**/*.css" />
+    <FrontendSource Include="package.json" />
+    <FrontendSource Include="package-lock.json" />
+    <FrontendSource Include="tsconfig.json" />
+    <FrontendSource Include="tailwind.config.js" />
+  </ItemGroup>
+
+  <Target Name="NpmInstall" BeforeTargets="NpmBuild"
+          Inputs="package.json;package-lock.json"
+          Outputs="node_modules/.package-lock.json">
+    <Exec Command="npm install" />
+  </Target>
+
+  <Target Name="NpmBuild" BeforeTargets="Build"
+          Inputs="@(FrontendSource)"
+          Outputs="wwwroot/js/share.js;wwwroot/js/reveal.js;wwwroot/css/style.css">
+    <Exec Command="npm run build" />
+  </Target>
+
 </Project>

@@ -1,81 +1,110 @@
 using Dapper;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System;
-using Microsoft.Data.Sqlite;
+using Snappass;
 using Xunit;
 
-namespace Snappass.NET.UnitTest
+namespace Snappass.NET.UnitTest;
+
+public class SqliteStoreTests
 {
-	public class UnitTest1
+	private static SqliteConnection CreateConnection()
 	{
-		private static SqliteConnection CreateConnection()
-		{
-			var sqliteConnection = new SqliteConnection("Data Source=:memory:");
-			var createScript = $@"
-				CREATE TABLE ""Secret"" (
-					""Key""	TEXT UNIQUE,
-					""CreatedDt""	TEXT NOT NULL,
-					""ExpireDt""	TEXT NOT NULL,
-					""EncryptedPassword""	TEXT NOT NULL,
-					PRIMARY KEY(""Key"")
-				)
-			";
-			sqliteConnection.Open();
-			sqliteConnection.Execute(createScript);
-			return sqliteConnection;
-		}
+		var conn = new SqliteConnection("Data Source=:memory:");
+		conn.Open();
+		conn.Execute(@"
+			CREATE TABLE Secret (
+				Id          TEXT PRIMARY KEY,
+				CreatedDt   TEXT NOT NULL,
+				ExpireDt    TEXT NOT NULL,
+				Ciphertext  TEXT NOT NULL
+			);
+			CREATE INDEX idx_secret_expire ON Secret(ExpireDt);
+		");
+		return conn;
+	}
 
-		[Fact]
-		public void StoredKey_IsStored()
-		{
-			// Arrange
-			var sqliteConnection = CreateConnection();
-			var sqliteStore = new SqliteStore(sqliteConnection, Mock.Of<ILogger<SqliteStore>>(), new CurrentDateTimeProvider());
-			sqliteStore.Store("encrypted", "key", TimeToLive.Day);
+	private static SqliteStore NewStore(SqliteConnection conn, IDateTimeProvider? clock = null) =>
+		new(conn, Mock.Of<ILogger<SqliteStore>>(), clock ?? new CurrentDateTimeProvider());
 
-			// Act
-			var wasStored = sqliteStore.Has("key");
+	[Fact]
+	public void Store_Then_Exists_ReturnsTrue()
+	{
+		using var conn = CreateConnection();
+		var store = NewStore(conn);
 
-			// Assert
-			Assert.True(wasStored);
-		}
+		store.Store("abc123", "ciphertext-blob", TimeToLive.Day);
 
-		[Fact]
-		public void StoredKey_CanBeRetrieved()
-		{
-			// Arrange
-			var sqliteConnection = CreateConnection();
-			var sqliteStore = new SqliteStore(sqliteConnection, Mock.Of<ILogger<SqliteStore>>(), new CurrentDateTimeProvider());
-			sqliteStore.Store("encrypted", "key", TimeToLive.Day);
+		Assert.True(store.Exists("abc123"));
+	}
 
-			// Act
-			var hasAfterStoring = sqliteStore.Has("key");
-			string result = sqliteStore.Retrieve("key");
+	[Fact]
+	public void Consume_Returns_StoredCiphertext()
+	{
+		using var conn = CreateConnection();
+		var store = NewStore(conn);
+		store.Store("abc123", "ciphertext-blob", TimeToLive.Day);
 
-			// Assert
-			Assert.Equal("encrypted", result);
-		}
+		var result = store.Consume("abc123");
 
-		[Fact]
-		public void StoredKeyExpired_DoesNotRetrieveSecret()
-		{
-			// Arrange
-			var sqliteConnection = CreateConnection();
-			var dateTimeProviderMock = new Mock<IDateTimeProvider>();
-			var inTheFuture = DateTime.Now.AddHours(2);
-			dateTimeProviderMock.Setup(x => x.Now).Returns(inTheFuture);
-			var sqliteStore = new SqliteStore(sqliteConnection, Mock.Of<ILogger<SqliteStore>>(), dateTimeProviderMock.Object);
-			sqliteStore.Store("encrypted", "key", TimeToLive.Hour);
+		Assert.Equal("ciphertext-blob", result);
+	}
 
-			// Act
-			bool wasStored = sqliteStore.Has("key");
-			string result = sqliteStore.Retrieve("key");
-			bool wasStoredAfterTryRetrieve = sqliteStore.Has("key");
+	[Fact]
+	public void Consume_IsOneShot()
+	{
+		using var conn = CreateConnection();
+		var store = NewStore(conn);
+		store.Store("abc123", "ciphertext-blob", TimeToLive.Day);
 
-			// Assert
-			Assert.Null(result);
-			Assert.False(wasStoredAfterTryRetrieve);
-		}
+		store.Consume("abc123");
+
+		Assert.Null(store.Consume("abc123"));
+		Assert.False(store.Exists("abc123"));
+	}
+
+	[Fact]
+	public void Consume_Expired_ReturnsNullAndDeletes()
+	{
+		using var conn = CreateConnection();
+		var t0 = DateTime.UtcNow;
+		var nowValue = t0;
+		var clock = new Mock<IDateTimeProvider>();
+		clock.Setup(c => c.Now).Returns(() => nowValue);
+		var store = NewStore(conn, clock.Object);
+
+		store.Store("abc123", "ciphertext-blob", TimeToLive.Hour);
+
+		nowValue = t0.AddHours(2);
+
+		Assert.Null(store.Consume("abc123"));
+		Assert.False(store.Exists("abc123"));
+	}
+
+	[Fact]
+	public void Exists_Expired_ReturnsFalse()
+	{
+		using var conn = CreateConnection();
+		var t0 = DateTime.UtcNow;
+		var nowValue = t0;
+		var clock = new Mock<IDateTimeProvider>();
+		clock.Setup(c => c.Now).Returns(() => nowValue);
+		var store = NewStore(conn, clock.Object);
+
+		store.Store("abc123", "ciphertext-blob", TimeToLive.Hour);
+
+		nowValue = t0.AddHours(2);
+
+		Assert.False(store.Exists("abc123"));
+	}
+
+	[Fact]
+	public void Consume_UnknownId_ReturnsNull()
+	{
+		using var conn = CreateConnection();
+		var store = NewStore(conn);
+
+		Assert.Null(store.Consume("nonexistent"));
 	}
 }

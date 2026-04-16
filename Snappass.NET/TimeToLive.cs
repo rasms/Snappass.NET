@@ -1,7 +1,9 @@
-﻿namespace Snappass
+namespace Snappass;
+
+public enum TimeToLive
 {
-    public enum TimeToLive
-    {
-        Week, Day, Hour, Month
-    }
+	Hour,
+	Day,
+	Week,
+	Month,
 }

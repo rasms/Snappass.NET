@@ -1,17 +1,18 @@
 {
   "name": "snappass.net",
-  "version": "1.0.0",
-  "description": "A .NET port of https://github.com/pinterest/snappass.",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "A .NET port of https://github.com/pinterest/snappass with client-side crypto.",
+  "private": true,
   "scripts": {
-    "build:watch": "npx tailwindcss -i ./Styles/input.css -o ./wwwroot/css/style.css --watch",
-    "build:prod": "npx tailwindcss -i ./Styles/input.css -o ./wwwroot/css/style.min.css --minify"
+    "build:js": "esbuild src/share.ts src/reveal.ts --bundle --minify --outdir=wwwroot/js --target=es2020 --sourcemap=linked",
+    "build:css": "tailwindcss -i Styles/input.css -o wwwroot/css/style.css --minify",
+    "build": "npm run build:js && npm run build:css",
+    "watch:js": "esbuild src/share.ts src/reveal.ts --bundle --outdir=wwwroot/js --target=es2020 --sourcemap --watch",
+    "watch:css": "tailwindcss -i Styles/input.css -o wwwroot/css/style.css --watch"
   },
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "tailwindcss": "^3.1.8"
+    "esbuild": "^0.24.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2"
   }
-, "-vs-binding":{"ProjectOpened":["install"]}
 }
-

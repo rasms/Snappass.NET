@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>Share a secret</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.ico">
+</head>
+<body class="h-full">
+  <div class="flex min-h-full md:items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8">
+      <div>
+        <img class="mx-auto h-12 w-auto" src="/logoipsum-262.svg" alt="">
+        <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">Share secret</h2>
+        <p class="mt-2 text-center text-sm text-gray-600">
+          The secret is encrypted in your browser. The server never sees the plaintext.
+        </p>
+      </div>
+
+      <div id="share-error" class="hidden bg-red-100 rounded-lg py-3 px-4 text-sm text-red-700" role="alert"></div>
+
+      <form id="share-form" class="space-y-6" autocomplete="off">
+        <div class="rounded-md shadow-sm">
+          <label for="password" class="sr-only">Secret</label>
+          <textarea id="password" name="password" rows="5" autofocus required autocomplete="off"
+            class="relative block w-full rounded-t-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+            placeholder="Enter sensitive data to securely share..."></textarea>
+          <button id="generate-pw" type="button"
+            class="block w-full rounded-b-md border border-t-0 border-gray-300 bg-slate-400 py-1 px-4 text-sm font-medium text-white hover:bg-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500">
+            Generate password
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label for="ttl" class="block w-1/3 text-sm text-gray-900">Expire after one</label>
+          <select id="ttl" name="ttl"
+            class="block w-2/3 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
+            <option value="Hour">Hour</option>
+            <option value="Day" selected>Day</option>
+            <option value="Week">Week</option>
+            <option value="Month">Month</option>
+          </select>
+        </div>
+
+        <button id="share-submit" type="submit"
+          class="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50">
+          Share secret
+        </button>
+      </form>
+
+      <div id="share-result" class="hidden space-y-3">
+        <p class="text-center text-sm text-gray-600">
+          Send this URL to the intended recipient. It can only be opened once.
+        </p>
+        <div class="flex rounded-md shadow-sm">
+          <input id="password-link" type="text" readonly
+            class="block w-full flex-1 rounded-l-md border border-gray-300 py-2 pl-4 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+          <button type="button" data-clipboard-target="#password-link" title="Copy to clipboard"
+            class="inline-flex items-center rounded-r-md border border-l-0 bg-indigo-600 px-4 text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            Copy
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/share.js"></script>
+</body>
+</html>
