@@ -111,6 +111,15 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 		return ciphertext;
 	}
 
+	public int PurgeExpired()
+	{
+		EnsureOpen();
+		using var cmd = _connection.CreateCommand();
+		cmd.CommandText = "DELETE FROM Secret WHERE ExpireDt <= @now";
+		cmd.Parameters.AddWithValue("@now", _clock.Now.ToString(DateTimeHandler.FORMAT, CultureInfo.InvariantCulture));
+		return cmd.ExecuteNonQuery();
+	}
+
 	public void Store(string id, string ciphertext, TimeToLive ttl)
 	{
 		EnsureOpen();

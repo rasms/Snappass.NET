@@ -56,12 +56,14 @@ builder.Services.AddRateLimiter(options =>
             });
 });
 
+builder.Services.AddHostedService<ExpiredSecretCleaner>();
+
 var app = builder.Build();
 
 using (var bootstrap = new SqliteConnection(connectionString))
 {
     bootstrap.Open();
-    EnsureSchema(bootstrap);
+    InitializeDatabase(bootstrap);
 }
 
 app.UseForwardedHeaders();
@@ -159,10 +161,16 @@ api.MapPost("/{id}/consume", (string id, ISecretStore store) =>
 
 app.Run();
 
-static void EnsureSchema(SqliteConnection connection)
+static void InitializeDatabase(SqliteConnection connection)
 {
     using var cmd = connection.CreateCommand();
+    // WAL + secure_delete are persistent on-disk settings (SQLite 3.32+),
+    // so one-shot at startup is enough. WAL cuts read/write contention;
+    // secure_delete overwrites freed pages with zeros so deleted ciphertexts
+    // don't linger in file slack.
     cmd.CommandText = @"
+        PRAGMA journal_mode=WAL;
+        PRAGMA secure_delete=ON;
         CREATE TABLE IF NOT EXISTS Secret (
             Id          TEXT PRIMARY KEY,
             CreatedDt   TEXT NOT NULL,

@@ -101,11 +101,15 @@ Klartext eines Secrets hat**.
 - [x] `UseForwardedHeaders` vorbereitet für Reverse-Proxy-Deployment
 - [x] HTTPS-Redirect nur in Production (bereits aus Phase 2)
 
-### Phase 4 — Storage-Layer
-- [ ] Einheitliches Connection-Lifecycle (Factory oder Singleton + WAL)
-- [ ] Schema-Init bei Startup
-- [ ] DB-Pfad konfigurierbar
-- [ ] Background-Cleanup alle 5 Min
+### Phase 4 — Storage-Layer ✓
+- [x] `PRAGMA journal_mode=WAL` + `PRAGMA secure_delete=ON` beim Startup
+      (SQLite 3.32+ persistiert beide im DB-Header; secure_delete=2/FAST
+      überschreibt freigegebene Pages mit Nullen vor Re-Use)
+- [x] Schema-Init beim Startup (aus Phase 1 erhalten)
+- [x] DB-Pfad konfigurierbar via `Storage:DatabasePath`
+- [x] `ExpiredSecretCleaner` als `BackgroundService`: 30 s Startdelay,
+      dann alle 5 min `DELETE FROM Secret WHERE ExpireDt <= @now`
+- [x] `ISecretStore.PurgeExpired` + zwei Tests
 
 ### Phase 5 — Tests
 - [ ] xUnit: Store (In-Memory SQLite), TTL-Ablauf, Consume-Idempotenz

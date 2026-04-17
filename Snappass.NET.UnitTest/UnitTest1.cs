@@ -107,4 +107,38 @@ public class SqliteStoreTests
 
 		Assert.Null(store.Consume("nonexistent"));
 	}
+
+	[Fact]
+	public void PurgeExpired_RemovesOnlyExpired()
+	{
+		using var conn = CreateConnection();
+		var t0 = DateTime.UtcNow;
+		var nowValue = t0;
+		var clock = new Mock<IDateTimeProvider>();
+		clock.Setup(c => c.Now).Returns(() => nowValue);
+		var store = NewStore(conn, clock.Object);
+
+		store.Store("fresh", "ct-fresh", TimeToLive.Day);
+		store.Store("old", "ct-old", TimeToLive.Hour);
+		nowValue = t0.AddHours(2);
+
+		var purged = store.PurgeExpired();
+
+		Assert.Equal(1, purged);
+		Assert.True(store.Exists("fresh"));
+		Assert.False(store.Exists("old"));
+		Assert.Null(store.Consume("old"));
+	}
+
+	[Fact]
+	public void PurgeExpired_NothingToPurge_ReturnsZero()
+	{
+		using var conn = CreateConnection();
+		var store = NewStore(conn);
+
+		store.Store("fresh", "ct", TimeToLive.Day);
+
+		Assert.Equal(0, store.PurgeExpired());
+		Assert.True(store.Exists("fresh"));
+	}
 }

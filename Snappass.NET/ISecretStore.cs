@@ -15,4 +15,5 @@ public interface ISecretStore
 	bool Exists(string id);
 	void Store(string id, string ciphertext, TimeToLive ttl);
 	string? Consume(string id);
+	int PurgeExpired();
 }
