@@ -1,14 +1,23 @@
 using System.Text.RegularExpressions;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Data.Sqlite;
 using Snappass;
 
 const int MaxCiphertextBytes = 100_000;
+const long MaxRequestBytes = 128 * 1024;
 var idPattern = new Regex("^[A-Za-z0-9_-]{16,64}$", RegexOptions.Compiled);
 
 var builder = WebApplication.CreateBuilder(args);
 
 var dbPath = builder.Configuration["Storage:DatabasePath"] ?? "database.sqlite";
 var connectionString = $"Data Source={dbPath}";
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = MaxRequestBytes;
+    options.AddServerHeader = false;
+});
 
 builder.Services.AddSingleton<IDateTimeProvider, CurrentDateTimeProvider>();
 builder.Services.AddScoped<ISecretStore, SqliteStore>();
@@ -21,6 +30,32 @@ builder.Services.AddHsts(options =>
     options.IncludeSubDomains = true;
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    // The deploy wires up KnownProxies/KnownNetworks so only the trusted reverse
+    // proxy can set X-Forwarded-*. Intentionally empty here.
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("share", ctx => Partition(ctx, permits: 10));
+    options.AddPolicy("consume", ctx => Partition(ctx, permits: 30));
+    options.AddPolicy("exists", ctx => Partition(ctx, permits: 60));
+
+    static RateLimitPartition<string> Partition(HttpContext ctx, int permits) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permits,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+});
+
 var app = builder.Build();
 
 using (var bootstrap = new SqliteConnection(connectionString))
@@ -29,12 +64,20 @@ using (var bootstrap = new SqliteConnection(connectionString))
     EnsureSchema(bootstrap);
 }
 
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
 else
 {
+    app.UseExceptionHandler(errorApp => errorApp.Run(async ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        ctx.Response.ContentType = "application/json; charset=utf-8";
+        await ctx.Response.WriteAsync("{\"error\":\"internal\"}");
+    }));
     app.UseHsts();
     app.UseHttpsRedirection();
 }
@@ -48,8 +91,31 @@ app.Use(async (context, next) =>
     h.Append("X-Frame-Options", "DENY");
     h.Append("Referrer-Policy", "no-referrer");
     h.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    h.Append("Cache-Control", "no-store");
     await next();
 });
+
+// Origin-Check: state-changing API calls must originate from our own host.
+// Cheap CSRF defence even for JSON-only APIs — a text/plain form-POST bypasses
+// the CORS preflight and would otherwise reach the endpoint.
+app.Use(async (context, next) =>
+{
+    if (HttpMethods.IsPost(context.Request.Method) &&
+        context.Request.Path.StartsWithSegments("/api"))
+    {
+        var origin = context.Request.Headers["Origin"].ToString();
+        if (string.IsNullOrEmpty(origin) ||
+            !Uri.TryCreate(origin, UriKind.Absolute, out var originUri) ||
+            !string.Equals(originUri.Authority, context.Request.Host.Value, StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+    }
+    await next();
+});
+
+app.UseRateLimiter();
 
 app.UseStaticFiles();
 
@@ -76,20 +142,20 @@ api.MapPost("/", (CreateSecretRequest req, ISecretStore store) =>
     var id = Guid.NewGuid().ToString("N");
     store.Store(id, req.Ciphertext, ttl);
     return Results.Ok(new { id });
-});
+}).RequireRateLimiting("share");
 
 api.MapGet("/{id}/exists", (string id, ISecretStore store) =>
 {
     if (!idPattern.IsMatch(id)) return Results.NotFound();
     return Results.Ok(new { exists = store.Exists(id) });
-});
+}).RequireRateLimiting("exists");
 
 api.MapPost("/{id}/consume", (string id, ISecretStore store) =>
 {
     if (!idPattern.IsMatch(id)) return Results.NotFound();
     var ct = store.Consume(id);
     return ct is null ? Results.NotFound() : Results.Ok(new { ciphertext = ct });
-});
+}).RequireRateLimiting("consume");
 
 app.Run();
 

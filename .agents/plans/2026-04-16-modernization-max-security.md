@@ -91,14 +91,15 @@ Klartext eines Secrets hat**.
 - [x] Size-Limit auf Ciphertext (100 KB, serverseitig), TTL-Whitelist
       serverseitig (Enum.TryParse)
 
-### Phase 3 — Hardening
-- [ ] `AddRateLimiter` (z. B. 10 Share/min, 30 Consume/min pro IP)
-- [ ] Antiforgery für Share-Submit (Origin/Referer-Check — echtes CSRF
-      ist bei JSON-only API von `SameSite`-Cookies eh abgedeckt, aber
-      sicher ist sicher)
-- [ ] `Request.Body` Size-Limit (Kestrel) zusätzlich zum App-Check
-- [ ] `MaxRequestBodySize` in `KestrelServerOptions`
-- [ ] HTTPS-Redirect nur in Production (steht schon, prüfen)
+### Phase 3 — Hardening ✓
+- [x] `AddRateLimiter` pro IP: 10 Share/min, 30 Consume/min, 60 Exists/min
+- [x] Origin-Check-Middleware für `POST /api/*` (403 bei Missing/Mismatch)
+- [x] Kestrel `MaxRequestBodySize = 128 KiB`, Body > Limit → 413
+- [x] `AddServerHeader = false` (kein `Server:` Header mehr)
+- [x] `Cache-Control: no-store` global gesetzt
+- [x] Generischer JSON-500-Handler in Production (`UseExceptionHandler`)
+- [x] `UseForwardedHeaders` vorbereitet für Reverse-Proxy-Deployment
+- [x] HTTPS-Redirect nur in Production (bereits aus Phase 2)
 
 ### Phase 4 — Storage-Layer
 - [ ] Einheitliches Connection-Lifecycle (Factory oder Singleton + WAL)
