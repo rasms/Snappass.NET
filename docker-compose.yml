@@ -1,0 +1,26 @@
+services:
+  snappass:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - snappass-data:/data
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Storage__DatabasePath: /data/database.sqlite
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Health check note: the chiseled runtime image has no shell, curl, or wget,
+    # so in-container health probes are not available. Use an external probe
+    # against GET /healthz (returns 200 {"status":"ok"}) from your reverse proxy
+    # or orchestrator (e.g. Caddy `health_uri`, nginx `proxy_health_check`,
+    # or a Kubernetes liveness probe).
+
+volumes:
+  snappass-data:

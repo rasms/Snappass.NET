@@ -124,6 +124,7 @@ app.UseStaticFiles();
 var sharePage = Path.Combine(app.Environment.WebRootPath, "share.html");
 var revealPage = Path.Combine(app.Environment.WebRootPath, "reveal.html");
 
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/", () => Results.File(sharePage, "text/html; charset=utf-8"));
 app.MapGet("/s/{id}", (string id) =>
     idPattern.IsMatch(id)

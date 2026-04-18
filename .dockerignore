@@ -1,0 +1,21 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/node_modules/
+
+# Version control and tooling
+.git/
+.github/
+.vs/
+.agents/
+
+# Docs (keep README.md out of image to reduce context; not needed at runtime)
+**/*.md
+!README.md
+
+# SQLite databases (mounted as a volume at runtime)
+**/database.sqlite*
+
+# Test projects (not needed in the Docker build context)
+Snappass.NET.UnitTest/
+Snappass.NET.IntegrationTest/

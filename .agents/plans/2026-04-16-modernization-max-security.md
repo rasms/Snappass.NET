@@ -1,7 +1,7 @@
 # Snappass.NET Modernization — Maximum Security
 
 **Erstellt:** 2026-04-16
-**Status:** In Umsetzung
+**Status:** Abgeschlossen (Phase 1–6)
 
 ## Ziel
 
@@ -129,11 +129,22 @@ Klartext eines Secrets hat**.
 - [ ] _Nicht gemacht:_ Playwright E2E mit Plaintext-Leak-Assertion
       (bewusst verschoben, nicht Phase-5-kritisch)
 
-### Phase 6 — Deployment & Docs
-- [ ] Dockerfile (chiseled), `docker-compose.yml`
-- [ ] README mit expliziten Claims **und** Non-Claims
-- [ ] `appsettings.Production.json` Template
-- [ ] `/healthz`
+### Phase 6 — Deployment & Docs ✓
+- [x] `GET /healthz` → `{"status":"ok"}`
+- [x] Multi-stage Dockerfile: SDK+Node builder → chiseled aspnet
+      Runtime (`mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled`,
+      non-root `app` user)
+- [x] `.dockerignore` (bin/obj/node_modules/tests/git/.agents raus)
+- [x] `docker-compose.yml` mit `read_only`, `cap_drop: [ALL]`,
+      `no-new-privileges`, named Volume für SQLite, Healthcheck extern
+      weil chiseled keine Shell/curl/wget hat
+- [x] `appsettings.Production.json` Template (`/data/database.sqlite`,
+      Log-Level Warning)
+- [x] `README.md` mit expliziten Claims / Non-Claims, Dev-Setup,
+      Docker-Compose-Deploy, Config-Tabelle, Security-Caveats
+- [ ] _Offen:_ `docker build` nicht verifiziert (Docker-Daemon im Dev
+      nicht gestartet) — CI wird das abdecken, wenn wir einen Build-Job
+      ergänzen
 
 ## 4. Offene Fragen
 - _(keine)_
