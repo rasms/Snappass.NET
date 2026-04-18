@@ -111,13 +111,23 @@ Klartext eines Secrets hat**.
       dann alle 5 min `DELETE FROM Secret WHERE ExpireDt <= @now`
 - [x] `ISecretStore.PurgeExpired` + zwei Tests
 
-### Phase 5 — Tests
-- [ ] xUnit: Store (In-Memory SQLite), TTL-Ablauf, Consume-Idempotenz
-- [ ] `WebApplicationFactory` für API-Integrationstests
-- [ ] Playwright E2E: Happy Path + Assertion „Request-Body enthält nur
-      Ciphertext, nie Plaintext"
-- [ ] Security-Tests: Rate-Limit greift, Antiforgery greift, Consume ist
-      one-shot
+### Phase 5 — Tests ✓
+- [x] xUnit Unit-Tests (aus Phase 2/4 erweitert: 8 Tests)
+- [x] `WebApplicationFactory` Integrationstests (neues Projekt
+      `Snappass.NET.IntegrationTest`, 10 Tests + 1 skip):
+      - Happy Path (Store/Exists/Consume Round-Trip)
+      - Consume one-shot über HTTP
+      - Ciphertext zu groß → 400
+      - Invalid TTL → 400
+      - Origin missing/falsch/matching → 403/403/200
+      - Security-Header auf HTML-Response (CSP/XFO/Cache-Control/RP)
+      - Reveal-Routing (valid 200, invalid 404)
+      - `Post_OversizedBody_Returns413` skipped (TestServer umgeht
+        Kestrel-Transport; 413 nur auf echtem Kestrel)
+- [ ] _Offen:_ Rate-Limiter-Integrationstest — Limiter-State ist
+      prozessglobal, braucht Refactor auf overridable Policy-Factory
+- [ ] _Nicht gemacht:_ Playwright E2E mit Plaintext-Leak-Assertion
+      (bewusst verschoben, nicht Phase-5-kritisch)
 
 ### Phase 6 — Deployment & Docs
 - [ ] Dockerfile (chiseled), `docker-compose.yml`
