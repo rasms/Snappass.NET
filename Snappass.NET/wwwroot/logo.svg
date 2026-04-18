@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Snappass.NET logo">
+  <title>Snappass.NET</title>
+  <!-- Shackle: classic U-shape above the body -->
+  <path d="M 22 28 V 22 A 10 10 0 0 1 42 22 V 28"
+        fill="none" stroke="#4f46e5" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Padlock body -->
+  <rect x="12" y="28" width="40" height="30" rx="5" fill="#4f46e5"/>
+  <!-- Lightning bolt inside body: snap + pass, ephemeral secret -->
+  <path d="M 31 40 V 32 L 20 45 H 28 V 54 L 39 40 H 31 Z" fill="#ffffff"/>
+</svg>

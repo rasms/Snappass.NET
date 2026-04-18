@@ -37,6 +37,13 @@ public sealed class SnappassFactory : WebApplicationFactory<Program>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Storage:DatabasePath"] = _dbPath,
+                // Raise per-endpoint rate limits far above anything the suite
+                // could hit. All TestServer clients share one rate-limit
+                // partition (RemoteIpAddress is null → "unknown"), so the
+                // production defaults would cross-contaminate tests.
+                ["RateLimit:Share"] = "100000",
+                ["RateLimit:Consume"] = "100000",
+                ["RateLimit:Exists"] = "100000",
             });
         });
 

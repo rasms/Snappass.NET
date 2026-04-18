@@ -1,7 +1,7 @@
 # Snappass.NET Modernization — Maximum Security
 
 **Erstellt:** 2026-04-16
-**Status:** Abgeschlossen (Phase 1–7)
+**Status:** Abgeschlossen (Phase 1–8)
 
 ## Ziel
 
@@ -172,6 +172,24 @@ beendet das Secret.
 - [x] Unit-Tests: multi-view Consume dekrementiert, letzter Consume löscht
 - [x] Integration-Test: 3-View-Round-Trip, vierter Consume → 404
 - [x] README How-it-works + Config-Tabelle aktualisiert
+
+### Phase 8 — Dropdown-Parität mit Doppler + Branding ✓
+
+- [x] TTL-Enum erweitert: `TwoDays`, `ThreeDays`, `TwoWeeks`, `ThreeMonths`
+      (matcht Dopplers 1d/2d/3d/1w/2w/1m/3m, plus unser `Hour` für
+      kurzlebiges)
+- [x] View-Allowlist: zusätzlich `20`, `50`, und Sentinel `0` = unlimited.
+      `RemainingViews = 0` in der DB wird von Consume als Unlimited-Flag
+      interpretiert (weder Update noch Delete; TTL greift weiterhin als
+      harte Obergrenze). Kein Schema-Change nötig.
+- [x] Logo: Vorhängeschloss mit Blitz-Bolzen innen, flat/indigo
+      (`#4f46e5`), inline SVG in `wwwroot/logo.svg`. Alter
+      `logoipsum-262.svg`-Platzhalter entfernt.
+- [x] Wordmark "Snappass.NET" neben dem Logo, auf share- und reveal-Seite
+- [x] Favicon: SVG-Link für moderne Browser, `favicon.ico` bleibt als
+      Fallback
+- [x] Tests ergänzt: unlimited (views=0) bleibt nach N Consumes bestehen,
+      wird erst durch TTL gelöscht
 
 ## 4. Offene Fragen
 - _(keine)_

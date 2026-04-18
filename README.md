@@ -37,8 +37,9 @@ complete database read-out does not reveal any secret.
 
 1. The sender opens the share page. The browser generates an AES-256-GCM key
    via the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API).
-2. The sender picks a TTL (up to one month) and a view limit (1 / 2 / 3 / 5 /
-   10). Whichever bound is hit first destroys the secret.
+2. The sender picks a TTL (1 hour up to 3 months, matching the share.doppler.com
+   range) and a view limit (1 / 2 / 3 / 5 / 10 / 20 / 50 / unlimited). Whichever
+   bound is hit first destroys the secret; unlimited views still expire at TTL.
 3. The browser encrypts the plaintext locally and `POST`s only the ciphertext
    to the server, which stores `(id, ciphertext, expires_at, remaining_views)`.
 4. The share URL takes the form `https://host/s/<id>#<key>`. The
@@ -112,20 +113,39 @@ All configuration is via environment variables (ASP.NET Core's standard
 | `ASPNETCORE_FORWARDEDHEADERS_ENABLED`| unset                    | Set to `true` behind a trusted reverse proxy                                |
 | `Logging__LogLevel__Default`         | `Warning` (Production)   | Minimum log level                                                           |
 
-### View-limit choices
+### Expiry choices
 
-| Value | Meaning                                                           |
-| ----- | ----------------------------------------------------------------- |
-| 1     | One-shot (default) — atomic read-then-delete, classic SnapPass    |
-| 2     | Two permitted reads, then delete                                  |
-| 3     | Three permitted reads, then delete                                |
-| 5     | Five permitted reads, then delete                                 |
-| 10    | Ten permitted reads, then delete                                  |
+TTL options mirror [share.doppler.com](https://share.doppler.com/), plus a
+short `1 hour` option for transient secrets:
 
-There is deliberately no "unlimited" option — destructive read is a
-load-bearing part of the security model. The server does not expose the
-remaining view count to the recipient, to avoid leaking consumption state
-to anyone who holds the URL.
+| TTL value     | Duration   |
+| ------------- | ---------- |
+| `Hour`        | 1 hour     |
+| `Day`         | 1 day      |
+| `TwoDays`     | 2 days     |
+| `ThreeDays`   | 3 days     |
+| `Week`        | 7 days     |
+| `TwoWeeks`    | 14 days    |
+| `Month`       | 31 days    |
+| `ThreeMonths` | 93 days    |
+
+View-limit options:
+
+| Value | Meaning                                                                       |
+| ----- | ----------------------------------------------------------------------------- |
+| `1`   | One-shot (default) — atomic read-then-delete, classic SnapPass                |
+| `2`   | Two permitted reads, then delete                                              |
+| `3`   | Three permitted reads, then delete                                            |
+| `5`   | Five permitted reads, then delete                                             |
+| `10`  | Ten permitted reads, then delete                                              |
+| `20`  | Twenty permitted reads, then delete                                           |
+| `50`  | Fifty permitted reads, then delete                                            |
+| `0`   | **Unlimited** reads within TTL — the row is destroyed only when the TTL fires |
+
+The server does not expose the remaining view count to the recipient, to
+avoid leaking consumption state to anyone who merely holds the URL. Even
+the unlimited option is still bounded by TTL, so destructive read remains
+the upper bound on a secret's lifetime.
 
 ### Rate-limit defaults
 
@@ -164,11 +184,13 @@ Frontend sources live in `Snappass.NET/src/` (TypeScript) and
 dotnet test
 ```
 
-- **`Snappass.NET.UnitTest`** — 10 tests covering the store, TTL expiry,
-  one-shot and multi-view semantics, and background-purge behaviour.
-- **`Snappass.NET.IntegrationTest`** — 12 tests (+1 skip) driving the full
+- **`Snappass.NET.UnitTest`** — 13 tests covering the store, the extended
+  TTL matrix, one-shot / multi-view / unlimited-view semantics, and the
+  background-purge behaviour.
+- **`Snappass.NET.IntegrationTest`** — 14 tests (+1 skip) driving the full
   HTTP pipeline through `WebApplicationFactory<Program>`: Origin checks,
-  validation, security headers, routing, multi-view round-trips.
+  validation, security headers, routing, multi-view and unlimited-view
+  round-trips, extended-TTL acceptance.
 
 The `Post_OversizedBody_Returns413` integration test is skipped because
 `TestServer` is in-process and bypasses Kestrel's `MaxRequestBodySize`; the

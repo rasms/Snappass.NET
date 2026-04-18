@@ -3,8 +3,12 @@ import { generatePassword } from './password';
 import { wireClipboard } from './clipboard';
 
 const MAX_PLAINTEXT_BYTES = 64 * 1024;
-const VALID_TTLS = new Set(['Hour', 'Day', 'Week', 'Month']);
-const VALID_VIEWS = new Set([1, 2, 3, 5, 10]);
+const VALID_TTLS = new Set([
+  'Hour', 'Day', 'TwoDays', 'ThreeDays',
+  'Week', 'TwoWeeks', 'Month', 'ThreeMonths',
+]);
+// 0 is the "unlimited views within TTL" sentinel.
+const VALID_VIEWS = new Set([0, 1, 2, 3, 5, 10, 20, 50]);
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -30,9 +34,15 @@ function showResult(url: string, views: number) {
   $('share-form').classList.add('hidden');
   const linkInput = $<HTMLInputElement>('password-link');
   linkInput.value = url;
-  $('share-result-text').textContent = views === 1
-    ? 'Send this URL to the intended recipient. It can only be opened once.'
-    : `Send this URL to the intended recipient. It can be opened up to ${views} times.`;
+  let msg: string;
+  if (views === 0) {
+    msg = 'Send this URL to the intended recipient. It can be opened any number of times until it expires.';
+  } else if (views === 1) {
+    msg = 'Send this URL to the intended recipient. It can only be opened once.';
+  } else {
+    msg = `Send this URL to the intended recipient. It can be opened up to ${views} times.`;
+  }
+  $('share-result-text').textContent = msg;
   $('share-result').classList.remove('hidden');
   linkInput.select();
 }

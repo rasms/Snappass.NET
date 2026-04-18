@@ -9,9 +9,12 @@ const long MaxRequestBytes = 128 * 1024;
 var idPattern = new Regex("^[A-Za-z0-9_-]{16,64}$", RegexOptions.Compiled);
 
 // Allowlist for the view-limit dropdown. Mirrors share.doppler.com's
-// discrete choices but deliberately omits "unlimited": destructive read
-// is a load-bearing part of our security model.
-int[] allowedViews = [1, 2, 3, 5, 10];
+// discrete choices. The sentinel 0 means "unlimited views within the TTL"
+// — the row is not deleted on consume, so TTL is the only destruction
+// trigger. We still require a finite TTL, so even unlimited-view secrets
+// eventually self-destruct — destructive read is preserved as an upper
+// bound, just not per-view.
+int[] allowedViews = [0, 1, 2, 3, 5, 10, 20, 50];
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,15 +45,23 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
+// Rate-limit permits are env-configurable so the integration suite can raise
+// them for its shared partition. Defaults match what a public deployment
+// should see on a single Kestrel instance. Config is read lazily inside the
+// policy delegate because WebApplicationFactory applies its overrides after
+// the top-level Program body has already run.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("share", ctx => Partition(ctx, permits: 10));
-    options.AddPolicy("consume", ctx => Partition(ctx, permits: 30));
-    options.AddPolicy("exists", ctx => Partition(ctx, permits: 60));
+    options.AddPolicy("share", ctx => Partition(ctx, "RateLimit:Share", 10));
+    options.AddPolicy("consume", ctx => Partition(ctx, "RateLimit:Consume", 30));
+    options.AddPolicy("exists", ctx => Partition(ctx, "RateLimit:Exists", 60));
 
-    static RateLimitPartition<string> Partition(HttpContext ctx, int permits) =>
-        RateLimitPartition.GetFixedWindowLimiter(
+    static RateLimitPartition<string> Partition(HttpContext ctx, string configKey, int defaultPermits)
+    {
+        var config = ctx.RequestServices.GetRequiredService<IConfiguration>();
+        var permits = config.GetValue(configKey, defaultPermits);
+        return RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
@@ -59,6 +70,7 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true,
             });
+    }
 });
 
 builder.Services.AddHostedService<ExpiredSecretCleaner>();

@@ -162,6 +162,47 @@ public sealed class IntegrationTests : IClassFixture<SnappassFactory>
         Assert.False(existsBody?.Exists);
     }
 
+    [Fact]
+    public async Task Consume_UnlimitedViews_StaysAliveAcrossManyReads()
+    {
+        using var client = CreateClientWithOrigin();
+        var ct = SmallCiphertext();
+
+        // views = 0 is the sentinel for unlimited.
+        var storeResp = await client.PostAsJsonAsync("/api/secrets", new { ciphertext = ct, ttl = "Day", views = 0 });
+        Assert.Equal(HttpStatusCode.OK, storeResp.StatusCode);
+        var stored = await storeResp.Content.ReadFromJsonAsync<IdResponse>();
+        var id = stored!.Id;
+
+        // Consume 5 times — all succeed, row stays alive.
+        // (Rate limit on consume is 30/min, so 5 is well within budget.)
+        for (var i = 0; i < 5; i++)
+        {
+            var resp = await client.PostAsync($"/api/secrets/{id}/consume", null);
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            var body = await resp.Content.ReadFromJsonAsync<CiphertextResponse>();
+            Assert.Equal(ct, body?.Ciphertext);
+        }
+
+        // /exists still true after 5 reads.
+        var existsResp = await client.GetAsync($"/api/secrets/{id}/exists");
+        var existsBody = await existsResp.Content.ReadFromJsonAsync<ExistsResponse>();
+        Assert.True(existsBody?.Exists);
+    }
+
+    [Fact]
+    public async Task Store_ExtendedTtls_Accepted()
+    {
+        using var client = CreateClientWithOrigin();
+
+        // Smoke-test the new TTL values — each one should round-trip.
+        foreach (var ttl in new[] { "TwoDays", "ThreeDays", "TwoWeeks", "ThreeMonths" })
+        {
+            var resp = await client.PostAsJsonAsync("/api/secrets", new { ciphertext = SmallCiphertext(), ttl });
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Origin check
     // -------------------------------------------------------------------------

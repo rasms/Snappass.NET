@@ -100,7 +100,7 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 		}
 
 		// Expired rows are always deleted regardless of remaining views.
-		// Multi-view expiry: whichever limit (time or views) hits first wins.
+		// Whichever limit (time or views) hits first wins.
 		if (_clock.Now > expire)
 		{
 			using var delExpired = _connection.CreateCommand();
@@ -113,7 +113,14 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 			return null;
 		}
 
-		if (remaining <= 1)
+		if (remaining == 0)
+		{
+			// Sentinel 0 = unlimited views within TTL. No mutation; TTL is the
+			// only destruction trigger. The row is eventually reaped by
+			// ExpiredSecretCleaner or by a consume after ExpireDt.
+			tx.Commit();
+		}
+		else if (remaining <= 1)
 		{
 			// Last (or only) permitted view — destroy the row.
 			using var delLast = _connection.CreateCommand();
@@ -121,6 +128,7 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 			delLast.CommandText = "DELETE FROM Secret WHERE Id = @id";
 			delLast.Parameters.AddWithValue("@id", id);
 			delLast.ExecuteNonQuery();
+			tx.Commit();
 		}
 		else
 		{
@@ -130,9 +138,9 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 			dec.CommandText = "UPDATE Secret SET RemainingViews = RemainingViews - 1 WHERE Id = @id";
 			dec.Parameters.AddWithValue("@id", id);
 			dec.ExecuteNonQuery();
+			tx.Commit();
 		}
 
-		tx.Commit();
 		return ciphertext;
 	}
 
@@ -147,7 +155,8 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 
 	public void Store(string id, string ciphertext, TimeToLive ttl, int views)
 	{
-		if (views < 1) throw new ArgumentOutOfRangeException(nameof(views), "views must be >= 1");
+		// views == 0 is the sentinel for "unlimited" — everything else is a concrete count.
+		if (views < 0) throw new ArgumentOutOfRangeException(nameof(views), "views must be >= 0");
 
 		EnsureOpen();
 		using var insert = _connection.CreateCommand();
@@ -169,8 +178,12 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 	{
 		TimeToLive.Hour => 1,
 		TimeToLive.Day => 24,
+		TimeToLive.TwoDays => 24 * 2,
+		TimeToLive.ThreeDays => 24 * 3,
 		TimeToLive.Week => 24 * 7,
+		TimeToLive.TwoWeeks => 24 * 14,
 		TimeToLive.Month => 24 * 31,
+		TimeToLive.ThreeMonths => 24 * 93,
 		_ => throw new ArgumentOutOfRangeException(nameof(ttl)),
 	};
 
