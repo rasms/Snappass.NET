@@ -37,17 +37,20 @@ complete database read-out does not reveal any secret.
 
 1. The sender opens the share page. The browser generates an AES-256-GCM key
    via the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API).
-2. The browser encrypts the plaintext locally and `POST`s only the ciphertext
-   to the server, which stores `(id, ciphertext, expires_at)`.
-3. The share URL takes the form `https://host/s/<id>#<key>`. The
+2. The sender picks a TTL (up to one month) and a view limit (1 / 2 / 3 / 5 /
+   10). Whichever bound is hit first destroys the secret.
+3. The browser encrypts the plaintext locally and `POST`s only the ciphertext
+   to the server, which stores `(id, ciphertext, expires_at, remaining_views)`.
+4. The share URL takes the form `https://host/s/<id>#<key>`. The
    [URL fragment](https://developer.mozilla.org/en-US/docs/Web/API/URL/hash)
    after `#` is never sent in any HTTP request, so neither the server nor any
    proxy/log/link-preview crawler sees the key.
-4. The recipient opens the link. The reveal page reads the key from
+5. The recipient opens the link. The reveal page reads the key from
    `location.hash`, fetches the ciphertext, and decrypts it locally.
-5. Retrieval is atomic: the server reads the row and deletes it in a single
-   SQLite transaction. A background service additionally purges expired rows
-   every five minutes.
+6. Retrieval is atomic: in a single SQLite transaction the server either
+   decrements `remaining_views` and returns the ciphertext, or — on the final
+   permitted view — deletes the row and returns the ciphertext. A background
+   service additionally purges expired rows every five minutes.
 
 ## Security model
 
@@ -58,7 +61,7 @@ complete database read-out does not reveal any secret.
 | Server compromise with full database read                | Server stores only AES-256-GCM ciphertext; the key is never transmitted                      |
 | Log leaks (application, reverse-proxy, WAF)              | Key lives in the URL fragment, which is not sent in requests or the `Referer` header         |
 | Link-preview crawlers (Slack, Teams, iMessage, …)        | Crawlers fetch the URL but not the fragment; they never see the key                          |
-| Replay after retrieval                                   | Atomic read-then-delete in a single SQLite transaction                                       |
+| Replay after view limit                                  | Atomic read-then-decrement (or delete on final view) in a single SQLite transaction          |
 | Replay after TTL                                         | Per-consume expiry check plus background purge; `secure_delete=ON` zero-wipes freed pages    |
 | Brute force on secret IDs                                | 128-bit random IDs (`Guid.NewGuid().ToString("N")`); endpoints are rate-limited per IP       |
 | Cross-site request forgery                               | `Origin` header match required on every state-changing `POST`; strict CSP; no same-origin cookies |
@@ -109,6 +112,21 @@ All configuration is via environment variables (ASP.NET Core's standard
 | `ASPNETCORE_FORWARDEDHEADERS_ENABLED`| unset                    | Set to `true` behind a trusted reverse proxy                                |
 | `Logging__LogLevel__Default`         | `Warning` (Production)   | Minimum log level                                                           |
 
+### View-limit choices
+
+| Value | Meaning                                                           |
+| ----- | ----------------------------------------------------------------- |
+| 1     | One-shot (default) — atomic read-then-delete, classic SnapPass    |
+| 2     | Two permitted reads, then delete                                  |
+| 3     | Three permitted reads, then delete                                |
+| 5     | Five permitted reads, then delete                                 |
+| 10    | Ten permitted reads, then delete                                  |
+
+There is deliberately no "unlimited" option — destructive read is a
+load-bearing part of the security model. The server does not expose the
+remaining view count to the recipient, to avoid leaking consumption state
+to anyone who holds the URL.
+
 ### Rate-limit defaults
 
 | Endpoint                  | Limit         |
@@ -146,11 +164,11 @@ Frontend sources live in `Snappass.NET/src/` (TypeScript) and
 dotnet test
 ```
 
-- **`Snappass.NET.UnitTest`** — 8 tests covering the store, TTL expiry,
-  one-shot semantics, and background-purge behaviour.
-- **`Snappass.NET.IntegrationTest`** — 10 tests (+1 skip) driving the full
+- **`Snappass.NET.UnitTest`** — 10 tests covering the store, TTL expiry,
+  one-shot and multi-view semantics, and background-purge behaviour.
+- **`Snappass.NET.IntegrationTest`** — 12 tests (+1 skip) driving the full
   HTTP pipeline through `WebApplicationFactory<Program>`: Origin checks,
-  validation, security headers, routing.
+  validation, security headers, routing, multi-view round-trips.
 
 The `Post_OversizedBody_Returns413` integration test is skipped because
 `TestServer` is in-process and bypasses Kestrel's `MaxRequestBodySize`; the

@@ -4,6 +4,7 @@ import { wireClipboard } from './clipboard';
 
 const MAX_PLAINTEXT_BYTES = 64 * 1024;
 const VALID_TTLS = new Set(['Hour', 'Day', 'Week', 'Month']);
+const VALID_VIEWS = new Set([1, 2, 3, 5, 10]);
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -11,11 +12,11 @@ function $<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
-async function createSecret(ciphertext: string, ttl: string): Promise<string> {
+async function createSecret(ciphertext: string, ttl: string, views: number): Promise<string> {
   const res = await fetch('/api/secrets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ciphertext, ttl }),
+    body: JSON.stringify({ ciphertext, ttl, views }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -25,10 +26,13 @@ async function createSecret(ciphertext: string, ttl: string): Promise<string> {
   return data.id;
 }
 
-function showResult(url: string) {
+function showResult(url: string, views: number) {
   $('share-form').classList.add('hidden');
   const linkInput = $<HTMLInputElement>('password-link');
   linkInput.value = url;
+  $('share-result-text').textContent = views === 1
+    ? 'Send this URL to the intended recipient. It can only be opened once.'
+    : `Send this URL to the intended recipient. It can be opened up to ${views} times.`;
   $('share-result').classList.remove('hidden');
   linkInput.select();
 }
@@ -49,6 +53,7 @@ async function onSubmit(e: SubmitEvent) {
 
   const password = $<HTMLTextAreaElement>('password').value;
   const ttl = $<HTMLSelectElement>('ttl').value;
+  const views = Number($<HTMLSelectElement>('views').value);
 
   if (!password) {
     showError('Secret darf nicht leer sein.');
@@ -63,6 +68,10 @@ async function onSubmit(e: SubmitEvent) {
     showError('Ungültige Gültigkeitsdauer.');
     return;
   }
+  if (!VALID_VIEWS.has(views)) {
+    showError('Ungültige View-Anzahl.');
+    return;
+  }
 
   const submit = $<HTMLButtonElement>('share-submit');
   submit.disabled = true;
@@ -72,9 +81,9 @@ async function onSubmit(e: SubmitEvent) {
     const blob = await encrypt(password, key);
     const rawKey = await exportKey(key);
 
-    const id = await createSecret(toBase64Url(blob), ttl);
+    const id = await createSecret(toBase64Url(blob), ttl, views);
     const url = `${location.origin}/s/${encodeURIComponent(id)}#${toBase64Url(rawKey)}`;
-    showResult(url);
+    showResult(url, views);
   } catch (err) {
     showError(err instanceof Error ? err.message : 'Unbekannter Fehler.');
   } finally {

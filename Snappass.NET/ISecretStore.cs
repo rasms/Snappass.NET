@@ -13,7 +13,7 @@ public sealed class CurrentDateTimeProvider : IDateTimeProvider
 public interface ISecretStore
 {
 	bool Exists(string id);
-	void Store(string id, string ciphertext, TimeToLive ttl);
+	void Store(string id, string ciphertext, TimeToLive ttl, int views);
 	string? Consume(string id);
 	int PurgeExpired();
 }

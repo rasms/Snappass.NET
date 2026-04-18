@@ -8,6 +8,11 @@ const int MaxCiphertextBytes = 100_000;
 const long MaxRequestBytes = 128 * 1024;
 var idPattern = new Regex("^[A-Za-z0-9_-]{16,64}$", RegexOptions.Compiled);
 
+// Allowlist for the view-limit dropdown. Mirrors share.doppler.com's
+// discrete choices but deliberately omits "unlimited": destructive read
+// is a load-bearing part of our security model.
+int[] allowedViews = [1, 2, 3, 5, 10];
+
 var builder = WebApplication.CreateBuilder(args);
 
 var dbPath = builder.Configuration["Storage:DatabasePath"] ?? "database.sqlite";
@@ -142,8 +147,13 @@ api.MapPost("/", (CreateSecretRequest req, ISecretStore store) =>
     if (!Enum.TryParse<TimeToLive>(req.Ttl, ignoreCase: true, out var ttl))
         return Results.BadRequest(new { error = "invalid ttl" });
 
+    // Missing/null view count defaults to one-shot — same as pre-multi-view clients.
+    var views = req.Views ?? 1;
+    if (Array.IndexOf(allowedViews, views) < 0)
+        return Results.BadRequest(new { error = "invalid views" });
+
     var id = Guid.NewGuid().ToString("N");
-    store.Store(id, req.Ciphertext, ttl);
+    store.Store(id, req.Ciphertext, ttl, views);
     return Results.Ok(new { id });
 }).RequireRateLimiting("share");
 
@@ -173,15 +183,40 @@ static void InitializeDatabase(SqliteConnection connection)
         PRAGMA journal_mode=WAL;
         PRAGMA secure_delete=ON;
         CREATE TABLE IF NOT EXISTS Secret (
-            Id          TEXT PRIMARY KEY,
-            CreatedDt   TEXT NOT NULL,
-            ExpireDt    TEXT NOT NULL,
-            Ciphertext  TEXT NOT NULL
+            Id              TEXT PRIMARY KEY,
+            CreatedDt       TEXT NOT NULL,
+            ExpireDt        TEXT NOT NULL,
+            Ciphertext      TEXT NOT NULL,
+            RemainingViews  INTEGER NOT NULL DEFAULT 1
         );
         CREATE INDEX IF NOT EXISTS idx_secret_expire ON Secret(ExpireDt);";
     cmd.ExecuteNonQuery();
+
+    // Migration for pre-multi-view databases: add RemainingViews if missing.
+    // Idempotent via PRAGMA table_info — no migration framework needed for one column.
+    using var info = connection.CreateCommand();
+    info.CommandText = "PRAGMA table_info(Secret)";
+    var hasViews = false;
+    using (var reader = info.ExecuteReader())
+    {
+        while (reader.Read())
+        {
+            // table_info columns: cid, name, type, notnull, dflt_value, pk
+            if (string.Equals(reader.GetString(1), "RemainingViews", StringComparison.OrdinalIgnoreCase))
+            {
+                hasViews = true;
+                break;
+            }
+        }
+    }
+    if (!hasViews)
+    {
+        using var alter = connection.CreateCommand();
+        alter.CommandText = "ALTER TABLE Secret ADD COLUMN RemainingViews INTEGER NOT NULL DEFAULT 1";
+        alter.ExecuteNonQuery();
+    }
 }
 
-public sealed record CreateSecretRequest(string Ciphertext, string Ttl);
+public sealed record CreateSecretRequest(string Ciphertext, string Ttl, int? Views);
 
 public partial class Program;

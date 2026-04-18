@@ -74,40 +74,65 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 		using var select = _connection.CreateCommand();
 		select.Transaction = tx;
 		select.CommandText = @"
-			SELECT Ciphertext, ExpireDt
+			SELECT Ciphertext, ExpireDt, RemainingViews
 			FROM Secret
 			WHERE Id = @id";
 		select.Parameters.AddWithValue("@id", id);
 
 		string? ciphertext = null;
 		DateTime expire = DateTime.MinValue;
+		long remaining = 0;
 		using (var reader = select.ExecuteReader())
 		{
 			if (reader.Read())
 			{
 				ciphertext = reader.GetString(0);
 				expire = DateTime.ParseExact(reader.GetString(1), DateTimeHandler.FORMAT, CultureInfo.InvariantCulture);
+				remaining = reader.GetInt64(2);
 			}
 		}
 
-		using var delete = _connection.CreateCommand();
-		delete.Transaction = tx;
-		delete.CommandText = "DELETE FROM Secret WHERE Id = @id";
-		delete.Parameters.AddWithValue("@id", id);
-		delete.ExecuteNonQuery();
-
-		tx.Commit();
-
 		if (ciphertext is null)
 		{
+			tx.Rollback();
 			_logger.LogWarning("Consume requested for unknown id");
 			return null;
 		}
+
+		// Expired rows are always deleted regardless of remaining views.
+		// Multi-view expiry: whichever limit (time or views) hits first wins.
 		if (_clock.Now > expire)
 		{
+			using var delExpired = _connection.CreateCommand();
+			delExpired.Transaction = tx;
+			delExpired.CommandText = "DELETE FROM Secret WHERE Id = @id";
+			delExpired.Parameters.AddWithValue("@id", id);
+			delExpired.ExecuteNonQuery();
+			tx.Commit();
 			_logger.LogWarning("Consume requested for expired id (expired {Expire})", expire);
 			return null;
 		}
+
+		if (remaining <= 1)
+		{
+			// Last (or only) permitted view — destroy the row.
+			using var delLast = _connection.CreateCommand();
+			delLast.Transaction = tx;
+			delLast.CommandText = "DELETE FROM Secret WHERE Id = @id";
+			delLast.Parameters.AddWithValue("@id", id);
+			delLast.ExecuteNonQuery();
+		}
+		else
+		{
+			// More views permitted — decrement atomically.
+			using var dec = _connection.CreateCommand();
+			dec.Transaction = tx;
+			dec.CommandText = "UPDATE Secret SET RemainingViews = RemainingViews - 1 WHERE Id = @id";
+			dec.Parameters.AddWithValue("@id", id);
+			dec.ExecuteNonQuery();
+		}
+
+		tx.Commit();
 		return ciphertext;
 	}
 
@@ -120,13 +145,15 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 		return cmd.ExecuteNonQuery();
 	}
 
-	public void Store(string id, string ciphertext, TimeToLive ttl)
+	public void Store(string id, string ciphertext, TimeToLive ttl, int views)
 	{
+		if (views < 1) throw new ArgumentOutOfRangeException(nameof(views), "views must be >= 1");
+
 		EnsureOpen();
 		using var insert = _connection.CreateCommand();
 		insert.CommandText = @"
-			INSERT INTO Secret (Id, CreatedDt, ExpireDt, Ciphertext)
-			VALUES (@id, @createdDt, @expireDt, @ciphertext)";
+			INSERT INTO Secret (Id, CreatedDt, ExpireDt, Ciphertext, RemainingViews)
+			VALUES (@id, @createdDt, @expireDt, @ciphertext, @views)";
 
 		var now = _clock.Now;
 		var hours = TtlHours(ttl);
@@ -134,6 +161,7 @@ public sealed class SqliteStore : ISecretStore, IDisposable
 		insert.Parameters.AddWithValue("@createdDt", now.ToString(DateTimeHandler.FORMAT, CultureInfo.InvariantCulture));
 		insert.Parameters.AddWithValue("@expireDt", now.AddHours(hours).ToString(DateTimeHandler.FORMAT, CultureInfo.InvariantCulture));
 		insert.Parameters.AddWithValue("@ciphertext", ciphertext);
+		insert.Parameters.AddWithValue("@views", views);
 		insert.ExecuteNonQuery();
 	}
 

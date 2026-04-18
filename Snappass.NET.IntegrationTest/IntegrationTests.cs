@@ -118,6 +118,50 @@ public sealed class IntegrationTests : IClassFixture<SnappassFactory>
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 
+    [Fact]
+    public async Task Store_InvalidViews_Returns400()
+    {
+        // 7 is not in the allowlist {1,2,3,5,10}.
+        using var client = CreateClientWithOrigin();
+        var resp = await client.PostAsJsonAsync("/api/secrets", new { ciphertext = SmallCiphertext(), ttl = "Day", views = 7 });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // -------------------------------------------------------------------------
+    // Multi-view semantics (Doppler-style view limit)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Consume_MultiView_DecrementsThenExhausts()
+    {
+        using var client = CreateClientWithOrigin();
+        var ct = SmallCiphertext();
+
+        // Store with views = 3.
+        var storeResp = await client.PostAsJsonAsync("/api/secrets", new { ciphertext = ct, ttl = "Day", views = 3 });
+        Assert.Equal(HttpStatusCode.OK, storeResp.StatusCode);
+        var stored = await storeResp.Content.ReadFromJsonAsync<IdResponse>();
+        var id = stored!.Id;
+
+        // Three successful consumes, same ciphertext each time.
+        for (var i = 0; i < 3; i++)
+        {
+            var resp = await client.PostAsync($"/api/secrets/{id}/consume", null);
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            var body = await resp.Content.ReadFromJsonAsync<CiphertextResponse>();
+            Assert.Equal(ct, body?.Ciphertext);
+        }
+
+        // Fourth attempt — row is gone.
+        var exhausted = await client.PostAsync($"/api/secrets/{id}/consume", null);
+        Assert.Equal(HttpStatusCode.NotFound, exhausted.StatusCode);
+
+        // And /exists reflects that.
+        var existsResp = await client.GetAsync($"/api/secrets/{id}/exists");
+        var existsBody = await existsResp.Content.ReadFromJsonAsync<ExistsResponse>();
+        Assert.False(existsBody?.Exists);
+    }
+
     // -------------------------------------------------------------------------
     // Origin check
     // -------------------------------------------------------------------------

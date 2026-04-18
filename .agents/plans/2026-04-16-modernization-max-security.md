@@ -1,7 +1,7 @@
 # Snappass.NET Modernization — Maximum Security
 
 **Erstellt:** 2026-04-16
-**Status:** Abgeschlossen (Phase 1–6)
+**Status:** Abgeschlossen (Phase 1–7)
 
 ## Ziel
 
@@ -145,6 +145,33 @@ Klartext eines Secrets hat**.
 - [ ] _Offen:_ `docker build` nicht verifiziert (Docker-Daemon im Dev
       nicht gestartet) — CI wird das abdecken, wenn wir einen Build-Job
       ergänzen
+
+### Phase 7 — Multi-View Secrets ✓
+
+Angelehnt an [share.doppler.com](https://share.doppler.com/): zusätzlich zur
+TTL eine Obergrenze an Öffnungen. Was zuerst erreicht ist (Zeit oder Views),
+beendet das Secret.
+
+- [x] Schema: Spalte `RemainingViews INTEGER NOT NULL DEFAULT 1`, idempotente
+      Migration über `PRAGMA table_info`
+- [x] `ISecretStore.Store(id, ciphertext, ttl, views)` — neuer Parameter
+- [x] `SqliteStore.Consume` atomar: im selben Transaction-Scope entweder
+      `UPDATE SET RemainingViews = RemainingViews - 1` oder `DELETE` (wenn
+      der letzte View aufgebraucht ist); expired/unknown unverändert
+- [x] API `POST /api/secrets` akzeptiert `views` (int), serverseitige
+      Allowlist `{1, 2, 3, 5, 10}`, Default 1 → kein Verhaltenswechsel
+      für bestehende Clients
+- [x] **Bewusst kein** `remainingViews` in der `/exists`-Response:
+      minimiert Informationsleakage gegenüber Dritten, die die URL
+      fingen würden
+- [x] **Bewusst kein** Unlimited-Option: destruktiver Read bleibt Teil
+      der Zusage
+- [x] Frontend: zweites Dropdown auf der Share-Seite, Result-Text
+      passt sich an (one-shot vs. N-shot), Reveal-Seite-Wording
+      nicht mehr auf "nur einmal" festgenagelt
+- [x] Unit-Tests: multi-view Consume dekrementiert, letzter Consume löscht
+- [x] Integration-Test: 3-View-Round-Trip, vierter Consume → 404
+- [x] README How-it-works + Config-Tabelle aktualisiert
 
 ## 4. Offene Fragen
 - _(keine)_
