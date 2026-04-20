@@ -8,8 +8,9 @@ const int MaxCiphertextBytes = 100_000;
 const long MaxRequestBytes = 128 * 1024;
 var idPattern = new Regex("^[A-Za-z0-9_-]{16,64}$", RegexOptions.Compiled);
 
-// Allowlist for the view-limit dropdown. Mirrors share.doppler.com's
-// discrete choices. The sentinel 0 means "unlimited views within the TTL"
+// Allowlist for the view-limit dropdown. Discrete choices keep the
+// dropdown tractable and make validation an O(1) lookup instead of a
+// range check. The sentinel 0 means "unlimited views within the TTL"
 // — the row is not deleted on consume, so TTL is the only destruction
 // trigger. We still require a finite TTL, so even unlimited-view secrets
 // eventually self-destruct — destructive read is preserved as an upper

@@ -37,9 +37,9 @@ complete database read-out does not reveal any secret.
 
 1. The sender opens the share page. The browser generates an AES-256-GCM key
    via the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API).
-2. The sender picks a TTL (1 hour up to 3 months, matching the share.doppler.com
-   range) and a view limit (1 / 2 / 3 / 5 / 10 / 20 / 50 / unlimited). Whichever
-   bound is hit first destroys the secret; unlimited views still expire at TTL.
+2. The sender picks a TTL (1 hour up to 3 months) and a view limit
+   (1 / 2 / 3 / 5 / 10 / 20 / 50 / unlimited). Whichever bound is hit first
+   destroys the secret; unlimited views still expire at TTL.
 3. The browser encrypts the plaintext locally and `POST`s only the ciphertext
    to the server, which stores `(id, ciphertext, expires_at, remaining_views)`.
 4. The share URL takes the form `https://host/s/<id>#<key>`. The
@@ -146,8 +146,8 @@ All configuration is via environment variables (ASP.NET Core's standard
 
 ### Expiry choices
 
-TTL options mirror [share.doppler.com](https://share.doppler.com/), plus a
-short `1 hour` option for transient secrets:
+TTL options cover transient secrets (1 hour) through quarterly rotation
+windows (3 months):
 
 | TTL value     | Duration   |
 | ------------- | ---------- |

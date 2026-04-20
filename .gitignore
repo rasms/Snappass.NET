@@ -47,3 +47,5 @@ Snappass.NET/wwwroot/css/style.css
 # macOS
 .DS_Store
 
+# Local agent/planning notes — not part of the project
+.agents/

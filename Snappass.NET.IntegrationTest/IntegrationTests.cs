@@ -128,7 +128,7 @@ public sealed class IntegrationTests : IClassFixture<SnappassFactory>
     }
 
     // -------------------------------------------------------------------------
-    // Multi-view semantics (Doppler-style view limit)
+    // Multi-view semantics (TTL + view-count dual limit)
     // -------------------------------------------------------------------------
 
     [Fact]
