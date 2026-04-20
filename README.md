@@ -100,6 +100,37 @@ Pre-built images are published to GitHub Container Registry on every push to
 docker pull ghcr.io/rasms/snappass.net:latest
 ```
 
+To use the pre-built image without cloning the repo, create a
+`docker-compose.yml` with `image:` instead of `build:`:
+
+```yaml
+services:
+  snappass:
+    image: ghcr.io/rasms/snappass.net:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - snappass-data:/data
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Storage__DatabasePath: /data/database.sqlite
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  snappass-data:
+```
+
+Pin a specific version (`ghcr.io/rasms/snappass.net:vX.Y.Z` or
+`sha-<7-char>`) in production so `docker compose pull` doesn't surprise
+you with an unreviewed upgrade.
+
 ## Configuration
 
 All configuration is via environment variables (ASP.NET Core's standard
